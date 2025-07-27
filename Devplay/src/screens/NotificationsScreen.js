@@ -104,7 +104,9 @@ export default function NotificationsScreen({ navigation }) {
 
       <ScrollView style={styles.content}>
         {/* Settings Section */}
-        <View style={styles.section}>
+        <View
+          style={[styles.section, { backgroundColor: theme.cardBackground }]}
+        >
           <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
             {getText("configuration")}
           </Text>
@@ -113,7 +115,10 @@ export default function NotificationsScreen({ navigation }) {
               key={item.id}
               style={[
                 styles.settingItem,
-                { backgroundColor: theme.cardBackground },
+                {
+                  backgroundColor: theme.cardBackground,
+                  borderBottomColor: theme.border,
+                },
               ]}
             >
               <View style={styles.settingLeft}>
@@ -145,7 +150,9 @@ export default function NotificationsScreen({ navigation }) {
         </View>
 
         {/* Recent Notifications */}
-        <View style={styles.section}>
+        <View
+          style={[styles.section, { backgroundColor: theme.cardBackground }]}
+        >
           <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
             {getText("recentNotifications")}
           </Text>
@@ -154,7 +161,10 @@ export default function NotificationsScreen({ navigation }) {
               key={notification.id}
               style={[
                 styles.notificationItem,
-                { backgroundColor: theme.cardBackground },
+                {
+                  backgroundColor: theme.cardBackground,
+                  borderBottomColor: theme.border,
+                },
               ]}
             >
               <View
@@ -199,7 +209,6 @@ export default function NotificationsScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
   },
   header: {
     flexDirection: "row",
@@ -208,7 +217,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 15,
-    backgroundColor: "white",
   },
   backButton: {
     padding: 8,
@@ -216,7 +224,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
   },
   placeholder: {
     width: 40,
@@ -225,14 +232,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    backgroundColor: "white",
     marginTop: 20,
     paddingVertical: 15,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333",
     paddingHorizontal: 20,
     marginBottom: 15,
   },
@@ -243,7 +248,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   settingLeft: {
     flexDirection: "row",
@@ -256,12 +260,10 @@ const styles = StyleSheet.create({
   },
   settingTitle: {
     fontSize: 16,
-    color: "#333",
     marginBottom: 4,
   },
   settingDescription: {
     fontSize: 14,
-    color: "#666",
   },
   notificationItem: {
     flexDirection: "row",
@@ -269,7 +271,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   notificationIcon: {
     width: 40,
@@ -285,16 +286,13 @@ const styles = StyleSheet.create({
   notificationTitle: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#333",
     marginBottom: 4,
   },
   notificationDescription: {
     fontSize: 14,
-    color: "#666",
     marginBottom: 4,
   },
   notificationTime: {
     fontSize: 12,
-    color: "#999",
   },
 });

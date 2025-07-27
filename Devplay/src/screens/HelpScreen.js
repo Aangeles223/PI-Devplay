@@ -8,8 +8,10 @@ import {
   TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
 
 export default function HelpScreen({ navigation }) {
+  const { theme, getText } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedFaq, setExpandedFaq] = useState(null);
 
@@ -120,29 +122,29 @@ export default function HelpScreen({ navigation }) {
   const helpOptions = [
     {
       id: "contact",
-      title: "Contactar Soporte",
-      description: "Habla con nuestro equipo de atención al cliente",
+      titleKey: "contactSupport",
+      descriptionKey: "contactSupportDesc",
       icon: "headset-outline",
       action: "contact",
     },
     {
       id: "report",
-      title: "Reportar un Problema",
-      description: "Reporta errores o problemas técnicos",
+      titleKey: "reportProblem",
+      descriptionKey: "reportProblemDesc",
       icon: "bug-outline",
       action: "report",
     },
     {
       id: "feedback",
-      title: "Enviar Comentarios",
-      description: "Ayúdanos a mejorar DevPlay Store",
+      titleKey: "sendFeedback",
+      descriptionKey: "sendFeedbackDesc",
       icon: "chatbubble-ellipses-outline",
       action: "feedback",
     },
     {
       id: "community",
-      title: "Foro de la Comunidad",
-      description: "Conecta con otros usuarios",
+      titleKey: "communityForum",
+      descriptionKey: "communityForumDesc",
       icon: "people-outline",
       action: "community",
     },
@@ -181,34 +183,58 @@ export default function HelpScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[styles.container, { backgroundColor: theme.backgroundColor }]}
+    >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.backgroundColor }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="chevron-back" size={24} color="#333" />
+          <Ionicons name="chevron-back" size={24} color={theme.textColor} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Centro de Ayuda</Text>
+        <Text style={[styles.headerTitle, { color: theme.textColor }]}>
+          {getText("helpCenter")}
+        </Text>
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={[styles.content, { backgroundColor: theme.backgroundColor }]}
+      >
         {/* Search */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBox}>
-            <Ionicons name="search" size={20} color="#666" />
+        <View
+          style={[
+            styles.searchContainer,
+            { backgroundColor: theme.backgroundColor },
+          ]}
+        >
+          <View
+            style={[
+              styles.searchBox,
+              { backgroundColor: theme.cardBackground },
+            ]}
+          >
+            <Ionicons
+              name="search"
+              size={20}
+              color={theme.secondaryTextColor}
+            />
             <TextInput
-              style={styles.searchInput}
-              placeholder="Buscar en la ayuda..."
+              style={[styles.searchInput, { color: theme.textColor }]}
+              placeholder={getText("searchHelp")}
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.secondaryTextColor}
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery("")}>
-                <Ionicons name="close-circle" size={20} color="#666" />
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color={theme.secondaryTextColor}
+                />
               </TouchableOpacity>
             )}
           </View>
@@ -216,53 +242,114 @@ export default function HelpScreen({ navigation }) {
 
         {/* Quick Help Options */}
         {!searchQuery && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>¿Necesitas ayuda inmediata?</Text>
+          <View
+            style={[styles.section, { backgroundColor: theme.cardBackground }]}
+          >
+            <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+              {getText("needImmediateHelp")}
+            </Text>
             {helpOptions.map((option) => (
               <TouchableOpacity
                 key={option.id}
-                style={styles.helpOption}
+                style={[
+                  styles.helpOption,
+                  {
+                    backgroundColor: theme.cardBackground,
+                    borderBottomColor: theme.border,
+                  },
+                ]}
                 onPress={() => handleAction(option.action)}
               >
                 <View style={styles.helpOptionLeft}>
-                  <View style={styles.helpOptionIcon}>
-                    <Ionicons name={option.icon} size={24} color="#8E44AD" />
+                  <View
+                    style={[
+                      styles.helpOptionIcon,
+                      { backgroundColor: theme.backgroundColor },
+                    ]}
+                  >
+                    <Ionicons
+                      name={option.icon}
+                      size={24}
+                      color={theme.primary}
+                    />
                   </View>
                   <View style={styles.helpOptionInfo}>
-                    <Text style={styles.helpOptionTitle}>{option.title}</Text>
-                    <Text style={styles.helpOptionDescription}>
-                      {option.description}
+                    <Text
+                      style={[
+                        styles.helpOptionTitle,
+                        { color: theme.textColor },
+                      ]}
+                    >
+                      {getText(option.titleKey)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.helpOptionDescription,
+                        { color: theme.secondaryTextColor },
+                      ]}
+                    >
+                      {getText(option.descriptionKey)}
                     </Text>
                   </View>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color="#ccc" />
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={theme.secondaryTextColor}
+                />
               </TouchableOpacity>
             ))}
           </View>
         )}
 
         {/* FAQ Categories */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {searchQuery ? "Resultados de búsqueda" : "Preguntas Frecuentes"}
+        <View
+          style={[styles.section, { backgroundColor: theme.cardBackground }]}
+        >
+          <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+            {searchQuery ? getText("searchResults") : getText("faq")}
           </Text>
 
           {(searchQuery ? filteredFAQs : faqCategories).map((category) => (
             <View key={category.id} style={styles.faqCategory}>
               {!searchQuery && (
-                <View style={styles.categoryHeader}>
-                  <Ionicons name={category.icon} size={20} color="#8E44AD" />
-                  <Text style={styles.categoryTitle}>{category.title}</Text>
+                <View
+                  style={[
+                    styles.categoryHeader,
+                    { borderBottomColor: theme.border },
+                  ]}
+                >
+                  <Ionicons
+                    name={category.icon}
+                    size={20}
+                    color={theme.primary}
+                  />
+                  <Text
+                    style={[styles.categoryTitle, { color: theme.textColor }]}
+                  >
+                    {category.title}
+                  </Text>
                 </View>
               )}
 
               {category.questions.map((question) => (
-                <View key={question.id} style={styles.faqItem}>
+                <View
+                  key={question.id}
+                  style={[
+                    styles.faqItem,
+                    { backgroundColor: theme.cardBackground },
+                  ]}
+                >
                   <TouchableOpacity
                     style={styles.faqQuestion}
                     onPress={() => toggleFaq(question.id)}
                   >
-                    <Text style={styles.faqQuestionText}>
+                    <Text
+                      style={[
+                        styles.faqQuestionText,
+                        { color: theme.textColor },
+                      ]}
+                    >
                       {question.question}
                     </Text>
                     <Ionicons
@@ -272,13 +359,18 @@ export default function HelpScreen({ navigation }) {
                           : "chevron-down"
                       }
                       size={20}
-                      color="#666"
+                      color={theme.secondaryTextColor}
                     />
                   </TouchableOpacity>
 
                   {expandedFaq === question.id && (
                     <View style={styles.faqAnswer}>
-                      <Text style={styles.faqAnswerText}>
+                      <Text
+                        style={[
+                          styles.faqAnswerText,
+                          { color: theme.secondaryTextColor },
+                        ]}
+                      >
                         {question.answer}
                       </Text>
                     </View>
@@ -290,36 +382,58 @@ export default function HelpScreen({ navigation }) {
 
           {searchQuery && filteredFAQs.length === 0 && (
             <View style={styles.noResults}>
-              <Ionicons name="search" size={60} color="#ccc" />
-              <Text style={styles.noResultsTitle}>
-                No se encontraron resultados
+              <Ionicons
+                name="search"
+                size={60}
+                color={theme.secondaryTextColor}
+              />
+              <Text style={[styles.noResultsTitle, { color: theme.textColor }]}>
+                {getText("noSearchResults")}
               </Text>
-              <Text style={styles.noResultsDescription}>
-                Intenta con otras palabras clave o contacta con soporte
+              <Text
+                style={[
+                  styles.noResultsDescription,
+                  { color: theme.secondaryTextColor },
+                ]}
+              >
+                {getText("noSearchResultsDesc")}
               </Text>
             </View>
           )}
         </View>
 
         {/* Contact Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Información de Contacto</Text>
+        <View
+          style={[styles.section, { backgroundColor: theme.cardBackground }]}
+        >
+          <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+            {getText("contactInfo")}
+          </Text>
 
-          <View style={styles.contactInfo}>
+          <View
+            style={[
+              styles.contactInfo,
+              { backgroundColor: theme.cardBackground },
+            ]}
+          >
             <View style={styles.contactItem}>
-              <Ionicons name="mail-outline" size={20} color="#007AFF" />
-              <Text style={styles.contactText}>soporte@devplay.com</Text>
+              <Ionicons name="mail-outline" size={20} color={theme.primary} />
+              <Text style={[styles.contactText, { color: theme.textColor }]}>
+                soporte@devplay.com
+              </Text>
             </View>
 
             <View style={styles.contactItem}>
-              <Ionicons name="call-outline" size={20} color="#007AFF" />
-              <Text style={styles.contactText}>+1 (555) 123-4567</Text>
+              <Ionicons name="call-outline" size={20} color={theme.primary} />
+              <Text style={[styles.contactText, { color: theme.textColor }]}>
+                +1 (555) 123-4567
+              </Text>
             </View>
 
             <View style={styles.contactItem}>
-              <Ionicons name="time-outline" size={20} color="#007AFF" />
-              <Text style={styles.contactText}>
-                Lunes a Viernes, 9:00 AM - 6:00 PM
+              <Ionicons name="time-outline" size={20} color={theme.primary} />
+              <Text style={[styles.contactText, { color: theme.textColor }]}>
+                {getText("businessHours")}
               </Text>
             </View>
           </View>
@@ -327,14 +441,20 @@ export default function HelpScreen({ navigation }) {
 
         {/* App Info */}
         <View style={styles.appInfo}>
-          <Text style={styles.appInfoText}>
+          <Text
+            style={[styles.appInfoText, { color: theme.secondaryTextColor }]}
+          >
             DevPlay Store v1.0.0 • Build 100
           </Text>
           <TouchableOpacity>
-            <Text style={styles.privacyLink}>Política de Privacidad</Text>
+            <Text style={[styles.privacyLink, { color: theme.primary }]}>
+              {getText("privacyPolicy")}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity>
-            <Text style={styles.privacyLink}>Términos de Servicio</Text>
+            <Text style={[styles.privacyLink, { color: theme.primary }]}>
+              {getText("termsOfService")}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -345,7 +465,6 @@ export default function HelpScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
   },
   header: {
     flexDirection: "row",
@@ -354,7 +473,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 15,
-    backgroundColor: "white",
   },
   backButton: {
     padding: 8,
@@ -362,7 +480,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
   },
   placeholder: {
     width: 40,
@@ -371,14 +488,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   searchContainer: {
-    backgroundColor: "white",
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f8f9fa",
     borderRadius: 12,
     paddingHorizontal: 15,
     paddingVertical: 12,
@@ -387,17 +502,14 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     marginLeft: 10,
-    color: "#333",
   },
   section: {
-    backgroundColor: "white",
     marginTop: 10,
     padding: 20,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 15,
   },
   helpOption: {
@@ -406,7 +518,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   helpOptionLeft: {
     flexDirection: "row",
@@ -417,7 +528,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#f0f0f0",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 15,
@@ -428,12 +538,10 @@ const styles = StyleSheet.create({
   helpOptionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 2,
   },
   helpOptionDescription: {
     fontSize: 14,
-    color: "#666",
   },
   faqCategory: {
     marginBottom: 20,
@@ -444,12 +552,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   categoryTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333",
     marginLeft: 10,
   },
   faqItem: {
@@ -465,7 +571,6 @@ const styles = StyleSheet.create({
   faqQuestionText: {
     flex: 1,
     fontSize: 15,
-    color: "#333",
     fontWeight: "500",
     lineHeight: 22,
     marginRight: 10,
@@ -476,7 +581,6 @@ const styles = StyleSheet.create({
   },
   faqAnswerText: {
     fontSize: 14,
-    color: "#666",
     lineHeight: 20,
   },
   noResults: {
@@ -486,17 +590,14 @@ const styles = StyleSheet.create({
   noResultsTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#666",
     marginTop: 15,
     marginBottom: 5,
   },
   noResultsDescription: {
     fontSize: 14,
-    color: "#999",
     textAlign: "center",
   },
   contactInfo: {
-    backgroundColor: "#f8f9fa",
     borderRadius: 12,
     padding: 15,
   },
@@ -507,7 +608,6 @@ const styles = StyleSheet.create({
   },
   contactText: {
     fontSize: 14,
-    color: "#333",
     marginLeft: 10,
   },
   appInfo: {
@@ -517,7 +617,6 @@ const styles = StyleSheet.create({
   },
   appInfoText: {
     fontSize: 12,
-    color: "#999",
     marginBottom: 10,
   },
   privacyLink: {

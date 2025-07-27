@@ -9,8 +9,10 @@ import {
   TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
 
 export default function HistoryScreen({ navigation }) {
+  const { theme, getText } = useTheme();
   const [activeTab, setActiveTab] = useState("search");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -100,13 +102,13 @@ export default function HistoryScreen({ navigation }) {
   const tabs = [
     {
       id: "search",
-      title: "Búsquedas",
+      titleKey: "searches",
       count: searchHistory.length,
       icon: "search",
     },
     {
       id: "apps",
-      title: "Apps Vistas",
+      titleKey: "appsViewed",
       count: viewHistory.length,
       icon: "eye",
     },
@@ -119,12 +121,12 @@ export default function HistoryScreen({ navigation }) {
     yesterday.setDate(yesterday.getDate() - 1);
 
     if (date.toDateString() === today.toDateString()) {
-      return `Hoy a las ${date.toLocaleTimeString("es-ES", {
+      return `${getText("today")} ${date.toLocaleTimeString("es-ES", {
         hour: "2-digit",
         minute: "2-digit",
       })}`;
     } else if (date.toDateString() === yesterday.toDateString()) {
-      return `Ayer a las ${date.toLocaleTimeString("es-ES", {
+      return `${getText("yesterday")} ${date.toLocaleTimeString("es-ES", {
         hour: "2-digit",
         minute: "2-digit",
       })}`;
@@ -157,16 +159,23 @@ export default function HistoryScreen({ navigation }) {
   };
 
   const renderSearchItem = ({ item }) => (
-    <TouchableOpacity style={styles.historyItem}>
+    <TouchableOpacity
+      style={[styles.historyItem, { backgroundColor: theme.cardBackground }]}
+    >
       <View style={styles.itemLeft}>
         <View style={styles.itemIcon}>
-          <Ionicons name="search" size={20} color="#666" />
+          <Ionicons name="search" size={20} color={theme.secondaryTextColor} />
         </View>
         <View style={styles.itemInfo}>
-          <Text style={styles.itemTitle}>{item.query}</Text>
-          <Text style={styles.itemSubtitle}>
-            {item.results} resultado{item.results !== 1 ? "s" : ""} •{" "}
-            {formatDate(item.timestamp)}
+          <Text style={[styles.itemTitle, { color: theme.textColor }]}>
+            {item.query}
+          </Text>
+          <Text
+            style={[styles.itemSubtitle, { color: theme.secondaryTextColor }]}
+          >
+            {item.results}{" "}
+            {item.results !== 1 ? getText("resultsPlural") : getText("results")}{" "}
+            • {formatDate(item.timestamp)}
           </Text>
         </View>
       </View>
@@ -174,20 +183,26 @@ export default function HistoryScreen({ navigation }) {
         style={styles.removeButton}
         onPress={() => removeItem(item.id)}
       >
-        <Ionicons name="close" size={18} color="#666" />
+        <Ionicons name="close" size={18} color={theme.secondaryTextColor} />
       </TouchableOpacity>
     </TouchableOpacity>
   );
 
   const renderAppItem = ({ item }) => (
-    <TouchableOpacity style={styles.historyItem}>
+    <TouchableOpacity
+      style={[styles.historyItem, { backgroundColor: theme.cardBackground }]}
+    >
       <View style={styles.itemLeft}>
         <View style={styles.appIcon}>
-          <Ionicons name={item.icon} size={24} color="#8E44AD" />
+          <Ionicons name={item.icon} size={24} color={theme.primary} />
         </View>
         <View style={styles.itemInfo}>
-          <Text style={styles.itemTitle}>{item.appName}</Text>
-          <Text style={styles.itemSubtitle}>
+          <Text style={[styles.itemTitle, { color: theme.textColor }]}>
+            {item.appName}
+          </Text>
+          <Text
+            style={[styles.itemSubtitle, { color: theme.secondaryTextColor }]}
+          >
             {item.category} • {formatDate(item.timestamp)}
           </Text>
         </View>
@@ -207,58 +222,78 @@ export default function HistoryScreen({ navigation }) {
           <Text
             style={[
               styles.actionText,
-              item.action === "downloaded" && styles.downloadedText,
+              { color: theme.secondaryTextColor },
+              item.action === "downloaded" && { color: theme.primary },
             ]}
           >
-            {item.action === "downloaded" ? "Descargada" : "Vista"}
+            {item.action === "downloaded"
+              ? getText("downloaded")
+              : getText("viewed")}
           </Text>
         </View>
         <TouchableOpacity
           style={styles.removeButton}
           onPress={() => removeItem(item.id)}
         >
-          <Ionicons name="close" size={18} color="#666" />
+          <Ionicons name="close" size={18} color={theme.secondaryTextColor} />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[styles.container, { backgroundColor: theme.backgroundColor }]}
+    >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.backgroundColor }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="chevron-back" size={24} color="#333" />
+          <Ionicons name="chevron-back" size={24} color={theme.textColor} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Historial</Text>
+        <Text style={[styles.headerTitle, { color: theme.textColor }]}>
+          {getText("history")}
+        </Text>
         <TouchableOpacity style={styles.clearButton} onPress={clearHistory}>
-          <Text style={styles.clearButtonText}>Limpiar</Text>
+          <Text style={[styles.clearButtonText, { color: theme.primary }]}>
+            {getText("clear")}
+          </Text>
         </TouchableOpacity>
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabContainer}>
+      <View
+        style={[
+          styles.tabContainer,
+          { backgroundColor: theme.backgroundColor },
+        ]}
+      >
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab.id}
-            style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+            style={[
+              styles.tab,
+              {
+                backgroundColor:
+                  activeTab === tab.id ? theme.primary : theme.cardBackground,
+              },
+            ]}
             onPress={() => setActiveTab(tab.id)}
           >
             <Ionicons
               name={tab.icon}
               size={18}
-              color={activeTab === tab.id ? "white" : "#666"}
+              color={activeTab === tab.id ? "white" : theme.secondaryTextColor}
             />
             <Text
               style={[
                 styles.tabText,
-                activeTab === tab.id && styles.activeTabText,
+                { color: activeTab === tab.id ? "white" : theme.textColor },
               ]}
             >
-              {tab.title}
+              {getText(tab.titleKey)}
             </Text>
             {tab.count > 0 && (
               <View
@@ -282,21 +317,30 @@ export default function HistoryScreen({ navigation }) {
       </View>
 
       {/* Search */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={20} color="#666" />
+      <View
+        style={[
+          styles.searchContainer,
+          { backgroundColor: theme.backgroundColor },
+        ]}
+      >
+        <View
+          style={[styles.searchBox, { backgroundColor: theme.cardBackground }]}
+        >
+          <Ionicons name="search" size={20} color={theme.secondaryTextColor} />
           <TextInput
-            style={styles.searchInput}
-            placeholder={`Buscar en ${
-              activeTab === "search" ? "búsquedas" : "apps vistas"
-            }...`}
+            style={[styles.searchInput, { color: theme.textColor }]}
+            placeholder={`${getText("searchHistory")}`}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.secondaryTextColor}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Ionicons name="close-circle" size={20} color="#666" />
+              <Ionicons
+                name="close-circle"
+                size={20}
+                color={theme.secondaryTextColor}
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -304,35 +348,53 @@ export default function HistoryScreen({ navigation }) {
 
       {/* Statistics */}
       <View style={styles.statsContainer}>
-        <View style={styles.statsCard}>
-          <Text style={styles.statsTitle}>
+        <View
+          style={[styles.statsCard, { backgroundColor: theme.cardBackground }]}
+        >
+          <Text style={[styles.statsTitle, { color: theme.textColor }]}>
             {activeTab === "search"
-              ? "Actividad de Búsqueda"
-              : "Actividad de Navegación"}
+              ? getText("searchActivity")
+              : getText("browsingActivity")}
           </Text>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>
+              <Text style={[styles.statNumber, { color: theme.textColor }]}>
                 {activeTab === "search"
                   ? searchHistory.length
                   : viewHistory.length}
               </Text>
-              <Text style={styles.statLabel}>
-                {activeTab === "search" ? "Búsquedas" : "Apps vistas"}
+              <Text
+                style={[styles.statLabel, { color: theme.secondaryTextColor }]}
+              >
+                {activeTab === "search"
+                  ? getText("searches")
+                  : getText("appsViewed")}
               </Text>
             </View>
-            <View style={styles.statDivider} />
+            <View
+              style={[styles.statDivider, { backgroundColor: theme.border }]}
+            />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>7</Text>
-              <Text style={styles.statLabel}>Días activos</Text>
+              <Text style={[styles.statNumber, { color: theme.textColor }]}>
+                7
+              </Text>
+              <Text
+                style={[styles.statLabel, { color: theme.secondaryTextColor }]}
+              >
+                {getText("activeDays")}
+              </Text>
             </View>
-            <View style={styles.statDivider} />
+            <View
+              style={[styles.statDivider, { backgroundColor: theme.border }]}
+            />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>
+              <Text style={[styles.statNumber, { color: theme.textColor }]}>
                 {activeTab === "search" ? "2.4" : "4.2"}
               </Text>
-              <Text style={styles.statLabel}>
-                {activeTab === "search" ? "Por día" : "Por día"}
+              <Text
+                style={[styles.statLabel, { color: theme.secondaryTextColor }]}
+              >
+                {getText("perDay")}
               </Text>
             </View>
           </View>
@@ -351,32 +413,45 @@ export default function HistoryScreen({ navigation }) {
             <Ionicons
               name={activeTab === "search" ? "search" : "eye-outline"}
               size={80}
-              color="#ccc"
+              color={theme.secondaryTextColor}
             />
-            <Text style={styles.emptyTitle}>
+            <Text style={[styles.emptyTitle, { color: theme.textColor }]}>
               {searchQuery
-                ? "No se encontraron resultados"
+                ? getText("noSearchResults")
                 : activeTab === "search"
-                ? "No hay búsquedas recientes"
-                : "No hay apps vistas"}
+                ? getText("noRecentSearches")
+                : getText("noAppsViewed")}
             </Text>
-            <Text style={styles.emptySubtitle}>
+            <Text
+              style={[
+                styles.emptySubtitle,
+                { color: theme.secondaryTextColor },
+              ]}
+            >
               {searchQuery
-                ? "Intenta con otros términos de búsqueda"
+                ? getText("tryOtherTerms")
                 : activeTab === "search"
-                ? "Tus búsquedas aparecerán aquí"
-                : "Las apps que veas aparecerán aquí"}
+                ? getText("searchesAppearHere")
+                : getText("appsAppearHere")}
             </Text>
           </View>
         )}
       />
 
       {/* Privacy Notice */}
-      <View style={styles.privacyNotice}>
-        <Ionicons name="shield-checkmark-outline" size={16} color="#007AFF" />
-        <Text style={styles.privacyText}>
-          Tu historial se almacena localmente y puedes eliminarlo en cualquier
-          momento
+      <View
+        style={[
+          styles.privacyNotice,
+          { backgroundColor: theme.backgroundColor },
+        ]}
+      >
+        <Ionicons
+          name="shield-checkmark-outline"
+          size={16}
+          color={theme.primary}
+        />
+        <Text style={[styles.privacyText, { color: theme.secondaryTextColor }]}>
+          {getText("privacyNotice")}
         </Text>
       </View>
     </View>

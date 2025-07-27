@@ -11,8 +11,10 @@ import {
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
 
 export default function RegisterScreen({ navigation, onLogin }) {
+  const { theme, getText } = useTheme();
   const [formData, setFormData] = useState({
     name: "",
     username: "",

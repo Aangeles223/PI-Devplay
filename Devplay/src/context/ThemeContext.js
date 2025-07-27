@@ -96,6 +96,14 @@ export const ThemeProvider = ({ children }) => {
 
       // App Details Screen
       description: "Descripción",
+      techSpecs: "Ficha Técnica",
+      reviews: "Calificaciones y reseñas",
+      developer: "Vendedor",
+      size: "Tamaño",
+      category: "Categoría",
+      compatibility: "Compatibilidad",
+      version: "Versión",
+      updated: "Actualizado",
       similarGames: "Juegos similares",
       years: "años",
       free: "Gratis",
@@ -109,6 +117,9 @@ export const ThemeProvider = ({ children }) => {
       editProfile: "Editar perfil",
       logout: "Cerrar sesión",
       settings: "Configuración",
+      success: "Éxito",
+      profileUpdated: "Perfil actualizado correctamente",
+      confirmLogout: "¿Estás seguro de que quieres cerrar sesión?",
 
       // Settings
       notifications: "Notificaciones",
@@ -129,6 +140,95 @@ export const ThemeProvider = ({ children }) => {
       email: "Correo electrónico",
       phone: "Teléfono",
       country: "País",
+      install: "Instalar",
+      noFavorites: "No tienes favoritos",
+      noFavoritesDesc:
+        "Explora aplicaciones y marca las que más te gusten como favoritas",
+      exploreApps: "Explorar aplicaciones",
+
+      // Help Screen
+      helpCenter: "Centro de Ayuda",
+      searchHelp: "Buscar en la ayuda...",
+      needImmediateHelp: "¿Necesitas ayuda inmediata?",
+      contactSupport: "Contactar Soporte",
+      contactSupportDesc: "Habla con nuestro equipo de atención al cliente",
+      reportProblem: "Reportar un Problema",
+      reportProblemDesc: "Reporta errores o problemas técnicos",
+      sendFeedback: "Enviar Comentarios",
+      sendFeedbackDesc: "Ayúdanos a mejorar DevPlay Store",
+      communityForum: "Foro de la Comunidad",
+      communityForumDesc: "Conecta con otros usuarios",
+      searchResults: "Resultados de búsqueda",
+      faq: "Preguntas Frecuentes",
+      noSearchResults: "No se encontraron resultados",
+      noSearchResultsDesc:
+        "Intenta con otras palabras clave o contacta con soporte",
+      moreHelp: "¿Necesitas más ayuda?",
+      contactUsAnytime: "Contáctanos en cualquier momento",
+      contactInfo: "Información de Contacto",
+      businessHours: "Lunes a Viernes, 9:00 AM - 6:00 PM",
+      privacyPolicy: "Política de Privacidad",
+      termsOfService: "Términos de Servicio",
+
+      // History Screen
+      searches: "Búsquedas",
+      appsViewed: "Apps Vistas",
+      clear: "Limpiar",
+      searchHistory: "Buscar en historial...",
+      results: "resultado",
+      resultsPlural: "resultados",
+      today: "Hoy a las",
+      yesterday: "Ayer a las",
+      downloaded: "Descargada",
+      viewed: "Vista",
+      noSearchHistory: "Sin historial de búsquedas",
+      noViewHistory: "Sin historial de aplicaciones",
+      noHistoryMessage: "Tu actividad aparecerá aquí",
+      searchActivity: "Actividad de Búsqueda",
+      browsingActivity: "Actividad de Navegación",
+      activeDays: "Días activos",
+      perDay: "Por día",
+      noRecentSearches: "No hay búsquedas recientes",
+      noAppsViewed: "No hay apps vistas",
+      tryOtherTerms: "Intenta con otros términos de búsqueda",
+      searchesAppearHere: "Tus búsquedas aparecerán aquí",
+      appsAppearHere: "Las apps que veas aparecerán aquí",
+      privacyNotice:
+        "Tu historial se almacena localmente y puedes eliminarlo en cualquier momento",
+
+      // Purchase Screen
+      myPurchases: "Mis Compras",
+      totalApps: "Total de apps",
+      totalSpent: "Total gastado",
+      freeApps: "Apps gratuitas",
+      all: "Todos",
+      paid: "Pagadas",
+      free: "Gratuitas",
+      owned: "Poseído",
+      noPaidPurchases: "No tienes compras pagadas",
+      noFreeApps: "No tienes apps gratuitas",
+      noPurchases: "No tienes compras",
+      purchasesHistoryMessage:
+        "Las aplicaciones que descargues aparecerán en tu historial de compras",
+      needPurchaseHelp: "¿Necesitas ayuda con una compra?",
+      refunded: "Reembolsado",
+      noPaidPurchases: "No tienes compras pagadas",
+      noFreeApps: "No tienes apps gratuitas",
+      noPurchases: "No tienes compras",
+      purchasesDesc:
+        "Las aplicaciones que descargues aparecerán en tu historial de compras",
+
+      // Downloads Screen
+      downloaded: "Descargadas",
+      downloading: "Descargando",
+      pending: "Pendientes",
+      manage: "Administrar",
+      spaceUsed: "Espacio usado",
+      clearHistory: "Limpiar historial",
+      noDownloads: "No hay aplicaciones descargadas",
+      noDownloading: "No hay descargas en progreso",
+      noPending: "No hay descargas pendientes",
+      downloadsAppearHere: "Las aplicaciones que descargues aparecerán aquí",
 
       // Game specific
       games: "Juegos",
@@ -228,6 +328,14 @@ export const ThemeProvider = ({ children }) => {
 
       // App Details Screen
       description: "Description",
+      techSpecs: "Technical Info",
+      reviews: "Ratings and reviews",
+      developer: "Developer",
+      size: "Size",
+      category: "Category",
+      compatibility: "Compatibility",
+      version: "Version",
+      updated: "Updated",
       similarGames: "Similar Games",
       years: "years",
       free: "Free",
@@ -241,6 +349,9 @@ export const ThemeProvider = ({ children }) => {
       editProfile: "Edit profile",
       logout: "Sign out",
       settings: "Settings",
+      success: "Success",
+      profileUpdated: "Profile updated successfully",
+      confirmLogout: "Are you sure you want to logout?",
 
       // Settings
       notifications: "Notifications",
@@ -261,6 +372,89 @@ export const ThemeProvider = ({ children }) => {
       email: "Email",
       phone: "Phone",
       country: "Country",
+      install: "Install",
+      noFavorites: "No favorites",
+      noFavoritesDesc:
+        "Explore apps and mark the ones you like most as favorites",
+      exploreApps: "Explore apps",
+
+      // Help Screen
+      helpCenter: "Help Center",
+      searchHelp: "Search help...",
+      needImmediateHelp: "Need immediate help?",
+      contactSupport: "Contact Support",
+      contactSupportDesc: "Talk to our customer service team",
+      reportProblem: "Report a Problem",
+      reportProblemDesc: "Report bugs or technical issues",
+      sendFeedback: "Send Feedback",
+      sendFeedbackDesc: "Help us improve DevPlay Store",
+      communityForum: "Community Forum",
+      communityForumDesc: "Connect with other users",
+      searchResults: "Search results",
+      faq: "Frequently Asked Questions",
+      noSearchResults: "No results found",
+      noSearchResultsDesc: "Try other keywords or contact support",
+      moreHelp: "Need more help?",
+      contactUsAnytime: "Contact us anytime",
+      contactInfo: "Contact Information",
+      businessHours: "Monday to Friday, 9:00 AM - 6:00 PM",
+      privacyPolicy: "Privacy Policy",
+      termsOfService: "Terms of Service",
+
+      // History Screen
+      searches: "Searches",
+      appsViewed: "Apps Viewed",
+      clear: "Clear",
+      searchHistory: "Search history...",
+      results: "result",
+      resultsPlural: "results",
+      today: "Today at",
+      yesterday: "Yesterday at",
+      downloaded: "Downloaded",
+      viewed: "Viewed",
+      noSearchHistory: "No search history",
+      noViewHistory: "No app history",
+      noHistoryMessage: "Your activity will appear here",
+      searchActivity: "Search Activity",
+      browsingActivity: "Browsing Activity",
+      activeDays: "Active days",
+      perDay: "Per day",
+      noRecentSearches: "No recent searches",
+      noAppsViewed: "No apps viewed",
+      tryOtherTerms: "Try other search terms",
+      searchesAppearHere: "Your searches will appear here",
+      appsAppearHere: "Apps you view will appear here",
+      privacyNotice:
+        "Your history is stored locally and you can delete it at any time",
+
+      // Purchase Screen
+      myPurchases: "My Purchases",
+      totalApps: "Total apps",
+      totalSpent: "Total spent",
+      freeApps: "Free apps",
+      all: "All",
+      paid: "Paid",
+      free: "Free",
+      owned: "Owned",
+      refunded: "Refunded",
+      noPaidPurchases: "No paid purchases",
+      noFreeApps: "No free apps",
+      noPurchases: "No purchases",
+      purchasesHistoryMessage:
+        "Downloaded apps will appear in your purchase history",
+      needPurchaseHelp: "Need help with a purchase?",
+
+      // Downloads Screen
+      downloaded: "Downloaded",
+      downloading: "Downloading",
+      pending: "Pending",
+      manage: "Manage",
+      spaceUsed: "Space used",
+      clearHistory: "Clear history",
+      noDownloads: "No downloaded apps",
+      noDownloading: "No downloads in progress",
+      noPending: "No pending downloads",
+      downloadsAppearHere: "Downloaded apps will appear here",
 
       // Game specific
       games: "Games",
@@ -330,6 +524,17 @@ export const ThemeProvider = ({ children }) => {
     return text;
   };
 
+  // Helper para traducir datos de juegos
+  const getGameText = (textData) => {
+    if (typeof textData === "string") {
+      return textData; // Si es un string simple, devolverlo
+    }
+    if (typeof textData === "object" && textData !== null) {
+      return textData[language] || textData.es || textData.en || ""; // Priorizar idioma actual
+    }
+    return "";
+  };
+
   // Temas de colores
   const themes = {
     light: {
@@ -371,6 +576,7 @@ export const ThemeProvider = ({ children }) => {
     toggleTheme,
     changeLanguage,
     getText,
+    getGameText,
   };
 
   return (

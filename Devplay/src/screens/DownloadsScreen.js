@@ -9,8 +9,10 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
 
 export default function DownloadsScreen({ navigation }) {
+  const { theme, getText } = useTheme();
   const [activeTab, setActiveTab] = useState("downloaded");
 
   // Mock data for downloaded apps
@@ -92,9 +94,17 @@ export default function DownloadsScreen({ navigation }) {
   ];
 
   const tabs = [
-    { id: "downloaded", title: "Descargadas", count: downloadedApps.length },
-    { id: "downloading", title: "Descargando", count: downloadingApps.length },
-    { id: "pending", title: "Pendientes", count: pendingApps.length },
+    {
+      id: "downloaded",
+      title: getText("downloaded"),
+      count: downloadedApps.length,
+    },
+    {
+      id: "downloading",
+      title: getText("downloading"),
+      count: downloadingApps.length,
+    },
+    { id: "pending", title: getText("pending"), count: pendingApps.length },
   ];
 
   const getCurrentData = () => {
@@ -111,33 +121,47 @@ export default function DownloadsScreen({ navigation }) {
   };
 
   const renderDownloadedApp = ({ item }) => (
-    <View style={styles.appItem}>
+    <View style={[styles.appItem, { backgroundColor: theme.cardBackground }]}>
       <View style={styles.appIcon}>
         <Ionicons name={item.icon} size={40} color="#8E44AD" />
       </View>
       <View style={styles.appInfo}>
-        <Text style={styles.appName}>{item.name}</Text>
-        <Text style={styles.appCategory}>{item.category}</Text>
-        <Text style={styles.appDetails}>
+        <Text style={[styles.appName, { color: theme.textColor }]}>
+          {item.name}
+        </Text>
+        <Text style={[styles.appCategory, { color: theme.secondaryTextColor }]}>
+          {item.category}
+        </Text>
+        <Text style={[styles.appDetails, { color: theme.secondaryTextColor }]}>
           {item.size} • {item.downloadDate}
         </Text>
-        <Text style={styles.appVersion}>Versión {item.version}</Text>
+        <Text style={[styles.appVersion, { color: theme.secondaryTextColor }]}>
+          Versión {item.version}
+        </Text>
       </View>
       <TouchableOpacity style={styles.actionButton}>
-        <Ionicons name="ellipsis-vertical" size={20} color="#666" />
+        <Ionicons
+          name="ellipsis-vertical"
+          size={20}
+          color={theme.secondaryTextColor}
+        />
       </TouchableOpacity>
     </View>
   );
 
   const renderDownloadingApp = ({ item }) => (
-    <View style={styles.appItem}>
+    <View style={[styles.appItem, { backgroundColor: theme.cardBackground }]}>
       <View style={styles.appIcon}>
         <Ionicons name={item.icon} size={40} color="#8E44AD" />
       </View>
       <View style={styles.appInfo}>
-        <Text style={styles.appName}>{item.name}</Text>
-        <Text style={styles.appCategory}>{item.category}</Text>
-        <Text style={styles.appDetails}>
+        <Text style={[styles.appName, { color: theme.textColor }]}>
+          {item.name}
+        </Text>
+        <Text style={[styles.appCategory, { color: theme.secondaryTextColor }]}>
+          {item.category}
+        </Text>
+        <Text style={[styles.appDetails, { color: theme.secondaryTextColor }]}>
           {item.downloaded} de {item.size}
         </Text>
         <View style={styles.progressContainer}>
@@ -146,24 +170,34 @@ export default function DownloadsScreen({ navigation }) {
               style={[styles.progressFill, { width: `${item.progress}%` }]}
             />
           </View>
-          <Text style={styles.progressText}>{item.progress}%</Text>
+          <Text
+            style={[styles.progressText, { color: theme.secondaryTextColor }]}
+          >
+            {item.progress}%
+          </Text>
         </View>
       </View>
       <TouchableOpacity style={styles.pauseButton}>
-        <Ionicons name="pause" size={20} color="#666" />
+        <Ionicons name="pause" size={20} color={theme.secondaryTextColor} />
       </TouchableOpacity>
     </View>
   );
 
   const renderPendingApp = ({ item }) => (
-    <View style={styles.appItem}>
+    <View style={[styles.appItem, { backgroundColor: theme.cardBackground }]}>
       <View style={styles.appIcon}>
         <Ionicons name={item.icon} size={40} color="#8E44AD" />
       </View>
       <View style={styles.appInfo}>
-        <Text style={styles.appName}>{item.name}</Text>
-        <Text style={styles.appCategory}>{item.category}</Text>
-        <Text style={styles.appDetails}>{item.size} • Esperando descarga</Text>
+        <Text style={[styles.appName, { color: theme.textColor }]}>
+          {item.name}
+        </Text>
+        <Text style={[styles.appCategory, { color: theme.secondaryTextColor }]}>
+          {item.category}
+        </Text>
+        <Text style={[styles.appDetails, { color: theme.secondaryTextColor }]}>
+          {item.size} • Esperando descarga
+        </Text>
       </View>
       <TouchableOpacity style={styles.downloadButton}>
         <Ionicons name="download" size={20} color="#007AFF" />
@@ -185,33 +219,46 @@ export default function DownloadsScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[styles.container, { backgroundColor: theme.backgroundColor }]}
+    >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.backgroundColor }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="chevron-back" size={24} color="#333" />
+          <Ionicons name="chevron-back" size={24} color={theme.textColor} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Descargas</Text>
+        <Text style={[styles.headerTitle, { color: theme.textColor }]}>
+          {getText("downloads")}
+        </Text>
         <TouchableOpacity style={styles.settingsButton}>
-          <Ionicons name="settings-outline" size={24} color="#333" />
+          <Ionicons name="settings-outline" size={24} color={theme.textColor} />
         </TouchableOpacity>
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabContainer}>
+      <View
+        style={[
+          styles.tabContainer,
+          { backgroundColor: theme.backgroundColor },
+        ]}
+      >
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab.id}
-            style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+            style={[
+              styles.tab,
+              activeTab === tab.id && { backgroundColor: theme.primary },
+            ]}
             onPress={() => setActiveTab(tab.id)}
           >
             <Text
               style={[
                 styles.tabText,
-                activeTab === tab.id && styles.activeTabText,
+                { color: theme.textColor },
+                activeTab === tab.id && { color: "#fff" },
               ]}
             >
               {tab.title}
@@ -226,15 +273,25 @@ export default function DownloadsScreen({ navigation }) {
       </View>
 
       {/* Storage Info */}
-      <View style={styles.storageInfo}>
+      <View
+        style={[styles.storageInfo, { backgroundColor: theme.cardBackground }]}
+      >
         <View style={styles.storageLeft}>
-          <Ionicons name="phone-portrait" size={20} color="#666" />
-          <Text style={styles.storageText}>
-            Espacio usado: 2.4 GB de 64 GB disponibles
+          <Ionicons
+            name="phone-portrait"
+            size={20}
+            color={theme.secondaryTextColor}
+          />
+          <Text
+            style={[styles.storageText, { color: theme.secondaryTextColor }]}
+          >
+            {getText("spaceUsed")}: 2.4 GB de 64 GB disponibles
           </Text>
         </View>
         <TouchableOpacity>
-          <Text style={styles.manageStorage}>Administrar</Text>
+          <Text style={[styles.manageStorage, { color: theme.primary }]}>
+            {getText("manage")}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -248,13 +305,18 @@ export default function DownloadsScreen({ navigation }) {
         ListEmptyComponent={() => (
           <View style={styles.emptyState}>
             <Ionicons name="download-outline" size={80} color="#ccc" />
-            <Text style={styles.emptyTitle}>
-              {activeTab === "downloaded" && "No hay aplicaciones descargadas"}
-              {activeTab === "downloading" && "No hay descargas en progreso"}
-              {activeTab === "pending" && "No hay descargas pendientes"}
+            <Text style={[styles.emptyTitle, { color: theme.textColor }]}>
+              {activeTab === "downloaded" && getText("noDownloads")}
+              {activeTab === "downloading" && getText("noDownloading")}
+              {activeTab === "pending" && getText("noPending")}
             </Text>
-            <Text style={styles.emptySubtitle}>
-              Las aplicaciones que descargues aparecerán aquí
+            <Text
+              style={[
+                styles.emptySubtitle,
+                { color: theme.secondaryTextColor },
+              ]}
+            >
+              {getText("downloadsAppearHere")}
             </Text>
           </View>
         )}

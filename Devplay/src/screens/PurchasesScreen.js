@@ -8,8 +8,10 @@ import {
   FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
 
 export default function PurchasesScreen({ navigation }) {
+  const { theme, getText } = useTheme();
   const [activeFilter, setActiveFilter] = useState("all");
 
   // Mock data for purchases
@@ -83,15 +85,15 @@ export default function PurchasesScreen({ navigation }) {
   ];
 
   const filters = [
-    { id: "all", title: "Todos", count: purchases.length },
+    { id: "all", title: getText("all"), count: purchases.length },
     {
       id: "paid",
-      title: "Pagadas",
+      title: getText("paid"),
       count: purchases.filter((p) => p.type === "paid").length,
     },
     {
       id: "free",
-      title: "Gratuitas",
+      title: getText("free"),
       count: purchases.filter((p) => p.type === "free").length,
     },
   ];
@@ -118,21 +120,36 @@ export default function PurchasesScreen({ navigation }) {
   };
 
   const renderPurchase = ({ item }) => (
-    <TouchableOpacity style={styles.purchaseItem}>
+    <TouchableOpacity
+      style={[styles.purchaseItem, { backgroundColor: theme.cardBackground }]}
+    >
       <View style={styles.purchaseIcon}>
-        <Ionicons name={item.icon} size={40} color="#8E44AD" />
+        <Ionicons name={item.icon} size={40} color={theme.primary} />
       </View>
       <View style={styles.purchaseInfo}>
-        <Text style={styles.purchaseName}>{item.name}</Text>
-        <Text style={styles.purchaseCategory}>{item.category}</Text>
-        <Text style={styles.purchaseDate}>{item.purchaseDate}</Text>
-        <Text style={styles.orderNumber}>Orden: {item.orderNumber}</Text>
+        <Text style={[styles.purchaseName, { color: theme.textColor }]}>
+          {item.name}
+        </Text>
+        <Text
+          style={[styles.purchaseCategory, { color: theme.secondaryTextColor }]}
+        >
+          {item.category}
+        </Text>
+        <Text
+          style={[styles.purchaseDate, { color: theme.secondaryTextColor }]}
+        >
+          {item.purchaseDate}
+        </Text>
+        <Text style={[styles.orderNumber, { color: theme.secondaryTextColor }]}>
+          Orden: {item.orderNumber}
+        </Text>
       </View>
       <View style={styles.purchaseRight}>
         <Text
           style={[
             styles.purchasePrice,
-            item.type === "free" && styles.freePrice,
+            { color: theme.textColor },
+            item.type === "free" && { color: theme.primary },
           ]}
         >
           {item.price}
@@ -141,13 +158,23 @@ export default function PurchasesScreen({ navigation }) {
           {item.status === "owned" && (
             <View style={styles.statusBadge}>
               <Ionicons name="checkmark-circle" size={16} color="#34C759" />
-              <Text style={styles.statusText}>Poseído</Text>
+              <Text
+                style={[styles.statusText, { color: theme.secondaryTextColor }]}
+              >
+                Poseído
+              </Text>
             </View>
           )}
           {item.status === "refunded" && (
             <View style={[styles.statusBadge, styles.refundedBadge]}>
               <Ionicons name="return-up-back" size={16} color="#FF9500" />
-              <Text style={[styles.statusText, styles.refundedText]}>
+              <Text
+                style={[
+                  styles.statusText,
+                  styles.refundedText,
+                  { color: theme.secondaryTextColor },
+                ]}
+              >
                 Reembolsado
               </Text>
             </View>
@@ -158,58 +185,104 @@ export default function PurchasesScreen({ navigation }) {
   );
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[styles.container, { backgroundColor: theme.backgroundColor }]}
+    >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.backgroundColor }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="chevron-back" size={24} color="#333" />
+          <Ionicons name="chevron-back" size={24} color={theme.textColor} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mis Compras</Text>
+        <Text style={[styles.headerTitle, { color: theme.textColor }]}>
+          {getText("myPurchases")}
+        </Text>
         <TouchableOpacity style={styles.searchButton}>
-          <Ionicons name="search" size={24} color="#333" />
+          <Ionicons name="search" size={24} color={theme.textColor} />
         </TouchableOpacity>
       </View>
 
       {/* Summary */}
-      <View style={styles.summaryContainer}>
-        <View style={styles.summaryCard}>
+      <View
+        style={[
+          styles.summaryContainer,
+          { backgroundColor: theme.backgroundColor },
+        ]}
+      >
+        <View
+          style={[
+            styles.summaryCard,
+            { backgroundColor: theme.cardBackground },
+          ]}
+        >
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryNumber}>{purchases.length}</Text>
-            <Text style={styles.summaryLabel}>Total de apps</Text>
+            <Text style={[styles.summaryNumber, { color: theme.textColor }]}>
+              {purchases.length}
+            </Text>
+            <Text
+              style={[styles.summaryLabel, { color: theme.secondaryTextColor }]}
+            >
+              {getText("totalApps")}
+            </Text>
           </View>
-          <View style={styles.summaryDivider} />
+          <View
+            style={[styles.summaryDivider, { backgroundColor: theme.border }]}
+          />
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryNumber}>${getTotalSpent()}</Text>
-            <Text style={styles.summaryLabel}>Total gastado</Text>
+            <Text style={[styles.summaryNumber, { color: theme.textColor }]}>
+              ${getTotalSpent()}
+            </Text>
+            <Text
+              style={[styles.summaryLabel, { color: theme.secondaryTextColor }]}
+            >
+              {getText("totalSpent")}
+            </Text>
           </View>
-          <View style={styles.summaryDivider} />
+          <View
+            style={[styles.summaryDivider, { backgroundColor: theme.border }]}
+          />
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryNumber}>
+            <Text style={[styles.summaryNumber, { color: theme.textColor }]}>
               {purchases.filter((p) => p.type === "free").length}
             </Text>
-            <Text style={styles.summaryLabel}>Apps gratuitas</Text>
+            <Text
+              style={[styles.summaryLabel, { color: theme.secondaryTextColor }]}
+            >
+              {getText("freeApps")}
+            </Text>
           </View>
         </View>
       </View>
 
       {/* Filters */}
-      <View style={styles.filterContainer}>
+      <View
+        style={[
+          styles.filterContainer,
+          { backgroundColor: theme.backgroundColor },
+        ]}
+      >
         {filters.map((filter) => (
           <TouchableOpacity
             key={filter.id}
             style={[
               styles.filterButton,
-              activeFilter === filter.id && styles.activeFilter,
+              {
+                backgroundColor:
+                  activeFilter === filter.id
+                    ? theme.primary
+                    : theme.cardBackground,
+              },
             ]}
             onPress={() => setActiveFilter(filter.id)}
           >
             <Text
               style={[
                 styles.filterText,
-                activeFilter === filter.id && styles.activeFilterText,
+                {
+                  color: activeFilter === filter.id ? "#fff" : theme.textColor,
+                },
               ]}
             >
               {filter.title}
@@ -232,26 +305,38 @@ export default function PurchasesScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={() => (
           <View style={styles.emptyState}>
-            <Ionicons name="bag-outline" size={80} color="#ccc" />
-            <Text style={styles.emptyTitle}>
-              {activeFilter === "paid" && "No tienes compras pagadas"}
-              {activeFilter === "free" && "No tienes apps gratuitas"}
-              {activeFilter === "all" && "No tienes compras"}
+            <Ionicons
+              name="bag-outline"
+              size={80}
+              color={theme.secondaryTextColor}
+            />
+            <Text style={[styles.emptyTitle, { color: theme.textColor }]}>
+              {activeFilter === "paid" && getText("noPaidPurchases")}
+              {activeFilter === "free" && getText("noFreeApps")}
+              {activeFilter === "all" && getText("noPurchases")}
             </Text>
-            <Text style={styles.emptySubtitle}>
-              Las aplicaciones que descargues aparecerán en tu historial de
-              compras
+            <Text
+              style={[
+                styles.emptySubtitle,
+                { color: theme.secondaryTextColor },
+              ]}
+            >
+              {getText("purchasesHistoryMessage")}
             </Text>
           </View>
         )}
       />
 
       {/* Bottom Info */}
-      <View style={styles.bottomInfo}>
+      <View style={[styles.bottomInfo, { borderTopColor: theme.border }]}>
         <TouchableOpacity style={styles.infoButton}>
-          <Ionicons name="help-circle-outline" size={20} color="#007AFF" />
-          <Text style={styles.infoButtonText}>
-            ¿Necesitas ayuda con una compra?
+          <Ionicons
+            name="help-circle-outline"
+            size={20}
+            color={theme.primary}
+          />
+          <Text style={[styles.infoButtonText, { color: theme.primary }]}>
+            {getText("needPurchaseHelp")}
           </Text>
         </TouchableOpacity>
       </View>

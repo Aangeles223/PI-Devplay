@@ -8,8 +8,10 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
 
 export default function FavoritesScreen({ navigation }) {
+  const { theme, getText } = useTheme();
   // Por ahora usamos datos simulados, luego puedes implementar AsyncStorage
   const [favorites, setFavorites] = useState([
     {
@@ -33,14 +35,24 @@ export default function FavoritesScreen({ navigation }) {
   };
 
   const renderFavorite = ({ item }) => (
-    <View style={styles.favoriteCard}>
+    <View
+      style={[styles.favoriteCard, { backgroundColor: theme.cardBackground }]}
+    >
       <Image source={{ uri: item.icon }} style={styles.appIcon} />
       <View style={styles.appInfo}>
-        <Text style={styles.appName}>{item.name}</Text>
-        <Text style={styles.appDeveloper}>{item.developer}</Text>
+        <Text style={[styles.appName, { color: theme.textColor }]}>
+          {item.name}
+        </Text>
+        <Text
+          style={[styles.appDeveloper, { color: theme.secondaryTextColor }]}
+        >
+          {item.developer}
+        </Text>
         <View style={styles.ratingContainer}>
           <Ionicons name="star" size={16} color="#FFD700" />
-          <Text style={styles.rating}>{item.rating}</Text>
+          <Text style={[styles.rating, { color: theme.textColor }]}>
+            {item.rating}
+          </Text>
         </View>
       </View>
       <View style={styles.actionButtons}>
@@ -51,7 +63,7 @@ export default function FavoritesScreen({ navigation }) {
           <Ionicons name="heart" size={20} color="#FF6B6B" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.installButton}>
-          <Text style={styles.installButtonText}>Instalar</Text>
+          <Text style={styles.installButtonText}>{getText("install")}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -59,24 +71,39 @@ export default function FavoritesScreen({ navigation }) {
 
   if (favorites.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="heart-outline" size={80} color="#ccc" />
-        <Text style={styles.emptyTitle}>No tienes favoritos</Text>
-        <Text style={styles.emptySubtitle}>
-          Explora aplicaciones y marca las que más te gusten como favoritas
+      <View
+        style={[
+          styles.emptyContainer,
+          { backgroundColor: theme.backgroundColor },
+        ]}
+      >
+        <Ionicons
+          name="heart-outline"
+          size={80}
+          color={theme.secondaryTextColor}
+        />
+        <Text style={[styles.emptyTitle, { color: theme.textColor }]}>
+          {getText("noFavorites")}
+        </Text>
+        <Text
+          style={[styles.emptySubtitle, { color: theme.secondaryTextColor }]}
+        >
+          {getText("noFavoritesDesc")}
         </Text>
         <TouchableOpacity
           style={styles.exploreButton}
           onPress={() => navigation.navigate("Home")}
         >
-          <Text style={styles.exploreButtonText}>Explorar aplicaciones</Text>
+          <Text style={styles.exploreButtonText}>{getText("exploreApps")}</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[styles.container, { backgroundColor: theme.backgroundColor }]}
+    >
       <FlatList
         data={favorites}
         renderItem={renderFavorite}

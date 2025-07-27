@@ -34,12 +34,7 @@ export default function ProfileScreen({ navigation, onLogout }) {
 
   const handleSaveProfile = () => {
     setIsEditing(false);
-    Alert.alert(
-      language === "es" ? "Éxito" : "Success",
-      language === "es"
-        ? "Perfil actualizado correctamente"
-        : "Profile updated successfully"
-    );
+    Alert.alert(getText("success"), getText("profileUpdated"));
   };
 
   const handleCancelEdit = () => {
@@ -49,20 +44,14 @@ export default function ProfileScreen({ navigation, onLogout }) {
 
   const handleLogout = () => {
     setShowMenu(false);
-    Alert.alert(
-      language === "es" ? "Cerrar sesión" : "Logout",
-      language === "es"
-        ? "¿Estás seguro de que quieres cerrar sesión?"
-        : "Are you sure you want to logout?",
-      [
-        { text: getText("cancel"), style: "cancel" },
-        {
-          text: getText("logout"),
-          style: "destructive",
-          onPress: () => onLogout(),
-        },
-      ]
-    );
+    Alert.alert(getText("logout"), getText("confirmLogout"), [
+      { text: getText("cancel"), style: "cancel" },
+      {
+        text: getText("logout"),
+        style: "destructive",
+        onPress: () => onLogout(),
+      },
+    ]);
   };
 
   const menuItems = [
@@ -373,7 +362,13 @@ export default function ProfileScreen({ navigation, onLogout }) {
           ]}
         >
           <TouchableOpacity
-            style={[styles.cancelButton, { borderColor: theme.border }]}
+            style={[
+              styles.cancelButton,
+              {
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundColor,
+              },
+            ]}
             onPress={handleCancelEdit}
           >
             <Text style={[styles.cancelButtonText, { color: theme.textColor }]}>
@@ -393,7 +388,12 @@ export default function ProfileScreen({ navigation, onLogout }) {
       <View
         style={[styles.menuSection, { backgroundColor: theme.cardBackground }]}
       >
-        <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+        <Text
+          style={[
+            styles.sectionTitle,
+            { color: theme.textColor, borderBottomColor: theme.border },
+          ]}
+        >
           {getText("settings")}
         </Text>
         {menuItems.map(renderMenuItem)}
@@ -431,7 +431,9 @@ export default function ProfileScreen({ navigation, onLogout }) {
               </Text>
             </TouchableOpacity>
 
-            <View style={styles.menuDivider} />
+            <View
+              style={[styles.menuDivider, { backgroundColor: theme.border }]}
+            />
 
             <TouchableOpacity style={styles.menuOption} onPress={handleLogout}>
               <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
@@ -458,7 +460,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 15,
-    backgroundColor: "white",
   },
   backButton: {
     padding: 8,
@@ -467,7 +468,6 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   profileSection: {
-    backgroundColor: "white",
     paddingHorizontal: 20,
     paddingBottom: 30,
     alignItems: "center",
@@ -475,7 +475,6 @@ const styles = StyleSheet.create({
   profileTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#333",
     marginBottom: 20,
   },
   profilePicContainer: {
@@ -495,7 +494,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   formSection: {
-    backgroundColor: "white",
     marginTop: 10,
     paddingHorizontal: 20,
     paddingVertical: 20,
@@ -514,7 +512,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#333",
     marginBottom: 8,
   },
   input: {
@@ -535,7 +532,6 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 16,
-    color: "#333",
   },
   selectInput: {
     flexDirection: "row",
@@ -548,21 +544,17 @@ const styles = StyleSheet.create({
   },
   selectText: {
     fontSize: 16,
-    color: "#333",
   },
   menuSection: {
-    backgroundColor: "white",
     marginTop: 10,
     paddingVertical: 10,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   menuItem: {
     flexDirection: "row",
@@ -571,7 +563,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#f8f9fa",
   },
   menuItemLeft: {
     flexDirection: "row",
@@ -579,37 +570,32 @@ const styles = StyleSheet.create({
   },
   menuItemText: {
     fontSize: 16,
-    color: "#333",
     marginLeft: 15,
   },
   inputDisabled: {
-    backgroundColor: "#f8f9fa",
-    color: "#666",
+    opacity: 0.6,
   },
   editButtonsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 20,
-    backgroundColor: "white",
     marginTop: 10,
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: "center",
     marginRight: 10,
+    borderWidth: 1,
   },
   cancelButtonText: {
-    color: "#666",
     fontSize: 16,
     fontWeight: "600",
   },
   saveButton: {
     flex: 1,
-    backgroundColor: "#007AFF",
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: "center",
@@ -629,7 +615,6 @@ const styles = StyleSheet.create({
     paddingRight: 20,
   },
   menuModal: {
-    backgroundColor: "white",
     borderRadius: 12,
     padding: 8,
     minWidth: 180,
@@ -650,12 +635,10 @@ const styles = StyleSheet.create({
   },
   menuOptionText: {
     fontSize: 16,
-    color: "#333",
     marginLeft: 12,
   },
   menuDivider: {
     height: 1,
-    backgroundColor: "#f0f0f0",
     marginVertical: 4,
   },
 });
