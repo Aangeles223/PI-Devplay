@@ -668,10 +668,14 @@ export const appsData = [
     rating: 4.0,
     downloads: "100M+",
     size: "1.2GB",
-    icon: require("../../assets/games/fifa-mobile/icon.jpg"),
+    icon: require("../../assets/games/fifa-mobile/icon.webp"),
     screenshots: [
-      require("../../assets/games/fifa-mobile/screenshot1.jpg"),
-      require("../../assets/games/fifa-mobile/screenshot2.jpg"),
+      require("../../assets/games/fifa-mobile/descarga.webp"),
+      require("../../assets/games/fifa-mobile/descarga (1).webp"),
+      require("../../assets/games/fifa-mobile/descarga (2).webp"),
+      require("../../assets/games/fifa-mobile/descarga (3).webp"),
+      require("../../assets/games/fifa-mobile/OIP (1).webp"),
+      require("../../assets/games/fifa-mobile/OIP (2).webp"),
     ],
     description: {
       es: "El mejor fútbol móvil con equipos y jugadores reales de todo el mundo.",
@@ -982,10 +986,12 @@ export const appsData = [
     rating: 4.6,
     downloads: "30M+",
     size: "156MB",
-    icon: require("../../assets/imagen2.jpg"),
+    icon: require("../../assets/games/forza-horizon-5/icon.webp"),
     screenshots: [
-      require("../../assets/imagen2.jpg"),
-      require("../../assets/imagen1.jpg"),
+      require("../../assets/games/forza-horizon-5/descarga.webp"),
+      require("../../assets/games/forza-horizon-5/OIP.webp"),
+      require("../../assets/games/forza-horizon-5/OIP (1).webp"),
+      require("../../assets/games/forza-horizon-5/OIP (2).webp"),
     ],
     description: {
       es: "Explora México en la experiencia de carreras de mundo abierto más grande de Forza Horizon.",

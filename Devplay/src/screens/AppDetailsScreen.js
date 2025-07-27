@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
+import { appsData } from "../data/appsData";
 
 const { width } = Dimensions.get("window");
 
@@ -20,6 +21,42 @@ export default function AppDetailsScreen({ route, navigation }) {
   const { app } = route.params;
   const [selectedScreenshot, setSelectedScreenshot] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
+
+  // Función para navegar a juegos similares
+  const handleSimilarGamePress = (gameId) => {
+    // Crear un mapeo de IDs a nombres de juegos en appsData
+    const gameMapping = {
+      rdr2: "Red Dead Redemption 2",
+      gow: "God Of War",
+      forza: "Forza Horizon 5",
+      minecraft: "Minecraft",
+      cod: "Call of Duty Mobile",
+      fifa: "FIFA Mobile",
+      amongus: "Among Us",
+      pubg: "PUBG Mobile",
+      subway: "Subway Surfers",
+      genshin: "Genshin Impact",
+      monument: "Monument Valley",
+      clash: "Clash Royale",
+      alto: "Alto's Odyssey",
+      dead: "Dead Cells",
+      nfs: "Need for Speed",
+      sustainity: "Sustainity",
+    };
+
+    const gameName = gameMapping[gameId];
+    if (gameName) {
+      // Buscar el juego en appsData por nombre
+      const gameData = appsData.find((game) => game.name === gameName);
+      if (gameData) {
+        navigation.push("AppDetails", { app: gameData });
+      } else {
+        console.log(`Juego no encontrado en appsData: ${gameName}`);
+      }
+    } else {
+      console.log(`ID de juego no encontrado en el mapeo: ${gameId}`);
+    }
+  };
 
   // Datos de reseñas simuladas
   const reviews = [
@@ -68,8 +105,29 @@ export default function AppDetailsScreen({ route, navigation }) {
       id: "forza",
       name: "Forza Horizon 5",
       price: getText("free"),
-      image: require("../../assets/games/forza-horizon-5/icon.jpg"),
+      image: require("../../assets/games/forza-horizon-5/icon.webp"),
       rating: 4.7,
+    },
+    {
+      id: "minecraft",
+      name: "Minecraft",
+      price: language === "es" ? "$29.99" : "$29.99",
+      image: require("../../assets/games/minecraft/icon.jpg"),
+      rating: 4.5,
+    },
+    {
+      id: "cod",
+      name: "Call of Duty Mobile",
+      price: getText("free"),
+      image: require("../../assets/games/call-of-duty/icon.jpg"),
+      rating: 4.3,
+    },
+    {
+      id: "pubg",
+      name: "PUBG Mobile",
+      price: getText("free"),
+      image: require("../../assets/games/pubg-mobile/icon.jpg"),
+      rating: 4.2,
     },
   ];
 
@@ -79,6 +137,7 @@ export default function AppDetailsScreen({ route, navigation }) {
         styles.similarGameCard,
         { backgroundColor: theme.cardBackground },
       ]}
+      onPress={() => handleSimilarGamePress(item.id)}
     >
       <Image source={item.image} style={styles.similarGameImage} />
       <Text style={[styles.similarGameName, { color: theme.textColor }]}>
