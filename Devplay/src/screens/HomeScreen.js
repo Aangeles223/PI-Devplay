@@ -107,24 +107,6 @@ export default function HomeScreen({ navigation, route }) {
           <Ionicons name="person" size={24} color="#fff" />
         </View>
       )}
-      {/* Botón de logout */}
-      <TouchableOpacity
-        style={{
-          marginLeft: 12,
-          backgroundColor: "#FF5252",
-          paddingHorizontal: 12,
-          paddingVertical: 6,
-          borderRadius: 15,
-          flexDirection: "row",
-          alignItems: "center",
-        }}
-        onPress={handleLogout}
-      >
-        <Ionicons name="log-out-outline" size={18} color="#fff" />
-        <Text style={{ color: "#fff", fontWeight: "600", marginLeft: 6 }}>
-          Salir
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 

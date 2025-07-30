@@ -9,7 +9,9 @@ import {
   Modal,
   Alert,
   Image,
+  FlatList,
 } from "react-native";
+import { Picker } from "@react-native-picker/picker"; // <--- import Picker
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { UserContext } from "../context/UserContext";
@@ -22,54 +24,75 @@ export default function ProfileScreen({ navigation, route, onLogout }) {
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState(null);
 
-  // Obtener datos del usuario desde el backend
+  // Listas de referencia
+  const [countries, setCountries] = useState([]); // <--- estados para listas
+  const [genders, setGenders] = useState([]);
+
+  // Modals
+  const [showGenderModal, setShowGenderModal] = useState(false);
+  const [showCountryModal, setShowCountryModal] = useState(false);
+
+  // 1) Obtener datos del usuario
   useEffect(() => {
-    if (userEmail) {
-      console.log("Usuario en contexto:", usuario);
-      console.log("Correo enviado al backend:", userEmail);
-      fetch(`http://10.0.0.11:3001/usuario/${userEmail}`)
-        .then((res) => {
-          console.log("Status:", res.status);
-          return res.json();
-        })
-        .then((data) => {
-          console.log("Perfil recibido:", data);
-          setProfileData(data);
-        })
-        .catch((err) => {
-          console.log("Error en fetch:", err);
-          setProfileData(null);
-        });
-    } else {
-      console.log("No se recibió correo en los parámetros de navegación.");
-    }
+    if (!userEmail) return;
+    const emailEsc = encodeURIComponent(userEmail);
+    fetch(`http://10.0.0.11:3001/usuario/${emailEsc}`)
+      .then((r) => r.json())
+      .then((data) => setProfileData(data))
+      .catch((err) => {
+        console.warn("Error al traer perfil:", err);
+        setProfileData(null);
+      });
   }, [userEmail]);
 
-  // Actualizar campos editables
+  // 2) Cargar países y géneros
+  useEffect(() => {
+    fetch("http://10.0.0.11:3001/paises")
+      .then((r) => r.json())
+      .then(setCountries)
+      .catch(console.warn);
+
+    fetch("http://10.0.0.11:3001/generos")
+      .then((r) => r.json())
+      .then(setGenders)
+      .catch(console.warn);
+  }, []);
+
   const handleInputChange = (field, value) => {
     setProfileData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Guardar cambios en el perfil (puedes conectar con tu backend aquí)
+  // 3) Guardar cambios
   const handleSaveProfile = () => {
     setIsEditing(false);
-    // Ejemplo de actualización (puedes modificar según tu API)
+    const updatedData = {
+      nombre: profileData.nombre,
+      telefono: profileData.telefono,
+      // enviamos los ids
+      pais_id: profileData.pais_id,
+      genero_id: profileData.genero_id,
+      direccion: profileData.direccion,
+      fecha_nacimiento: profileData.fecha_nacimiento?.slice(0, 10) || null,
+    };
+
     fetch(`http://10.0.0.11:3001/usuario/${profileData.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(profileData),
+      body: JSON.stringify(updatedData),
     })
-      .then((res) => res.json())
+      .then((r) => r.json())
       .then((data) => {
-        console.log("Perfil recibido:", data);
-        setProfileData(data);
+        if (data.success) {
+          setProfileData(data.usuario);
+          Alert.alert(
+            "Perfil actualizado",
+            "Los cambios se guardaron con éxito."
+          );
+        } else {
+          Alert.alert("Error", "No se pudo actualizar el perfil.");
+        }
       })
-      .then(() => {
-        Alert.alert(getText("success"), getText("profileUpdated"));
-      })
-      .catch(() => {
-        Alert.alert("Error", "No se pudo actualizar el perfil");
-      });
+      .catch(() => Alert.alert("Error", "No se pudo conectar al servidor."));
   };
 
   const handleEditProfile = () => {
@@ -99,6 +122,17 @@ export default function ProfileScreen({ navigation, route, onLogout }) {
         onPress: () => onLogout(),
       },
     ]);
+  };
+
+  const selectGender = (g) => {
+    handleInputChange("genero_id", g.id);
+    handleInputChange("genero", g.nombre);
+    setShowGenderModal(false);
+  };
+  const selectCountry = (c) => {
+    handleInputChange("pais_id", c.id);
+    handleInputChange("pais", c.nombre);
+    setShowCountryModal(false);
   };
 
   const menuItems = [
@@ -311,7 +345,7 @@ export default function ProfileScreen({ navigation, route, onLogout }) {
 
         <View style={styles.formGroup}>
           <Text style={[styles.label, { color: theme.textColor }]}>
-            {getText("phone")}
+            {language === "es" ? "Teléfono" : "Phone"}
           </Text>
           <TextInput
             style={[
@@ -324,11 +358,9 @@ export default function ProfileScreen({ navigation, route, onLogout }) {
               !isEditing && styles.inputDisabled,
             ]}
             value={profileData.telefono || ""}
-            placeholder={getText("phone")}
-            placeholderTextColor={theme.textTertiary}
-            keyboardType="phone-pad"
             editable={isEditing}
-            onChangeText={(value) => handleInputChange("telefono", value)}
+            keyboardType="phone-pad"
+            onChangeText={(val) => handleInputChange("telefono", val)}
           />
         </View>
 
@@ -359,47 +391,106 @@ export default function ProfileScreen({ navigation, route, onLogout }) {
             <Text style={[styles.label, { color: theme.textColor }]}>
               {language === "es" ? "Fecha de nacimiento" : "Birth date"}
             </Text>
-            <TouchableOpacity
+            <TextInput
               style={[
-                styles.dateInput,
+                styles.input,
                 {
                   backgroundColor: theme.backgroundColor,
+                  color: theme.textColor,
                   borderColor: theme.border,
                 },
+                !isEditing && styles.inputDisabled,
               ]}
-              disabled={!isEditing}
-            >
-              <Text style={[styles.dateText, { color: theme.textColor }]}>
-                {profileData.fecha_nacimiento
-                  ? profileData.fecha_nacimiento
-                  : "Selecciona fecha"}
-              </Text>
-              <Ionicons
-                name="calendar-outline"
-                size={20}
-                color={theme.iconColor}
-              />
-            </TouchableOpacity>
+              value={profileData.fecha_nacimiento?.slice(0, 10) || ""}
+              editable={isEditing}
+              placeholder="YYYY-MM-DD"
+              onChangeText={(val) => handleInputChange("fecha_nacimiento", val)}
+            />
           </View>
+
           <View style={styles.formGroupHalf}>
             <Text style={[styles.label, { color: theme.textColor }]}>
               {language === "es" ? "Género" : "Gender"}
             </Text>
-            <TouchableOpacity
-              style={[
-                styles.selectInput,
-                {
-                  backgroundColor: theme.backgroundColor,
-                  borderColor: theme.border,
-                },
-              ]}
-              disabled={!isEditing}
-            >
-              <Text style={[styles.selectText, { color: theme.textColor }]}>
-                {profileData.genero || "Sin especificar"}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color={theme.iconColor} />
-            </TouchableOpacity>
+            {isEditing ? (
+              <>
+                <TouchableOpacity
+                  style={styles.selectInput}
+                  onPress={() => setShowGenderModal(true)}
+                >
+                  <Text style={[styles.selectText, { color: theme.textColor }]}>
+                    {profileData.genero || "Selecciona..."}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={20}
+                    color={theme.iconColor}
+                  />
+                </TouchableOpacity>
+                <Modal
+                  visible={showGenderModal}
+                  transparent
+                  animationType="slide"
+                >
+                  <View style={styles.modalOverlay}>
+                    <View
+                      style={[
+                        styles.modalContent,
+                        { backgroundColor: theme.cardBackground },
+                      ]}
+                    >
+                      <FlatList
+                        data={genders}
+                        keyExtractor={(item) => item.id.toString()}
+                        renderItem={({ item }) => (
+                          <TouchableOpacity
+                            style={styles.modalItem}
+                            onPress={() => selectGender(item)}
+                          >
+                            <Text style={{ color: theme.textColor }}>
+                              {item.nombre}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowGenderModal(false)}
+                      >
+                        <Text
+                          style={{
+                            color: "#FF3B30",
+                            textAlign: "center",
+                            marginTop: 8,
+                          }}
+                        >
+                          Cancelar
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </Modal>
+              </>
+            ) : (
+              // … tu vista no-edit existente …
+              <View
+                style={[
+                  styles.selectInput,
+                  {
+                    backgroundColor: theme.backgroundColor,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.selectText, { color: theme.textColor }]}>
+                  {profileData.genero || "Sin especificar"}
+                </Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={20}
+                  color={theme.iconColor}
+                />
+              </View>
+            )}
           </View>
         </View>
 
@@ -407,21 +498,80 @@ export default function ProfileScreen({ navigation, route, onLogout }) {
           <Text style={[styles.label, { color: theme.textColor }]}>
             {getText("country")}
           </Text>
-          <TouchableOpacity
-            style={[
-              styles.selectInput,
-              {
-                backgroundColor: theme.backgroundColor,
-                borderColor: theme.border,
-              },
-            ]}
-            disabled={!isEditing}
-          >
-            <Text style={[styles.selectText, { color: theme.textColor }]}>
-              {profileData.pais || "Sin especificar"}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color={theme.iconColor} />
-          </TouchableOpacity>
+          {isEditing ? (
+            <>
+              <TouchableOpacity
+                style={styles.selectInput}
+                onPress={() => setShowCountryModal(true)}
+              >
+                <Text style={[styles.selectText, { color: theme.textColor }]}>
+                  {profileData.pais || "Selecciona..."}
+                </Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={20}
+                  color={theme.iconColor}
+                />
+              </TouchableOpacity>
+              <Modal
+                visible={showCountryModal}
+                transparent
+                animationType="slide"
+              >
+                <View style={styles.modalOverlay}>
+                  <View
+                    style={[
+                      styles.modalContent,
+                      { backgroundColor: theme.cardBackground },
+                    ]}
+                  >
+                    <FlatList
+                      data={countries}
+                      keyExtractor={(item) => item.id.toString()}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity
+                          style={styles.modalItem}
+                          onPress={() => selectCountry(item)}
+                        >
+                          <Text style={{ color: theme.textColor }}>
+                            {item.nombre}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowCountryModal(false)}
+                    >
+                      <Text
+                        style={{
+                          color: "#FF3B30",
+                          textAlign: "center",
+                          marginTop: 8,
+                        }}
+                      >
+                        Cancelar
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Modal>
+            </>
+          ) : (
+            <View
+              style={[
+                styles.selectInput,
+                {
+                  backgroundColor: theme.backgroundColor,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <Text style={[styles.selectText, { color: theme.textColor }]}>
+                {profileData.pais || "Sin especificar"}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color={theme.iconColor} />
+            </View>
+          )}
         </View>
 
         <View style={styles.formGroup}>
@@ -703,10 +853,26 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-start",
-    alignItems: "flex-end",
-    paddingTop: 50,
-    paddingRight: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    borderRadius: 12,
+    padding: 8,
+    width: "80%",
+    maxHeight: "70%",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
   menuModal: {
     borderRadius: 12,
