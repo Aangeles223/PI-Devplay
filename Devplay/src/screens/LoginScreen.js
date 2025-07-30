@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   View,
   Text,
@@ -12,38 +12,50 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
+import { UserContext } from "../context/UserContext";
 
 export default function LoginScreen({ navigation, onLogin }) {
   const { theme, getText } = useTheme();
+  const { setUsuario } = useContext(UserContext);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert("Error", "Por favor completa todos los campos");
       return;
     }
 
-    // Credenciales de prueba
-    const testCredentials = {
-      email: "admin@devplay.com",
-      password: "123456",
-    };
+    try {
+      const response = await fetch("http://10.0.0.11:3001/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          correo: email,
+          contraseña: password,
+        }),
+      });
 
-    // Verificar credenciales
-    if (
-      email === testCredentials.email &&
-      password === testCredentials.password
-    ) {
-      // Login exitoso
-      onLogin({ email, name: "Usuario DevPlay Admin" });
-    } else {
-      Alert.alert(
-        "Error",
-        "Credenciales incorrectas\n\nUsuario de prueba:\nEmail: admin@devplay.com\nContraseña: 123456"
-      );
+      // Verifica si la respuesta es válida JSON
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        Alert.alert("Error", "Respuesta inválida del servidor");
+        return;
+      }
+
+      // Verifica si la petición fue exitosa
+      if (response.ok && data.success) {
+        setUsuario(data.usuario); // <-- Esto guarda el usuario en el contexto
+        onLogin(data.usuario); // dispara en App.js el salto a MainNavigator
+      } else {
+        Alert.alert("Error", data.error || "Credenciales incorrectas");
+      }
+    } catch (error) {
+      Alert.alert("Error", error.message || "No se pudo conectar al servidor");
     }
   };
 

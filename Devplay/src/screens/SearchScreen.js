@@ -1,156 +1,244 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   TextInput,
   FlatList,
-  StyleSheet,
   TouchableOpacity,
   Image,
+  StyleSheet,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { appsData } from "../data/appsData";
 import { useTheme } from "../context/ThemeContext";
 
 export default function SearchScreen({ navigation }) {
   const { theme, getText } = useTheme();
   const [searchText, setSearchText] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
+  const [filteredApps, setFilteredApps] = useState([]);
+  const [recentSearches, setRecentSearches] = useState([
+    "minecraft",
+    "call of duty",
+    "among us",
+    "pubg",
+    "fortnite",
+  ]);
+  const [appsData, setAppsData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleSearch = (text) => {
-    setSearchText(text);
-    if (text.length > 0) {
-      const results = appsData.filter(
-        (app) =>
-          app.name.toLowerCase().includes(text.toLowerCase()) ||
-          app.developer.toLowerCase().includes(text.toLowerCase()) ||
-          app.category.toLowerCase().includes(text.toLowerCase())
-      );
-      setSearchResults(results);
-    } else {
-      setSearchResults([]);
+  // Obtener apps desde el backend al montar
+  useEffect(() => {
+    fetch("http://10.0.0.11:3001/apps")
+      .then((res) => res.json())
+      .then((data) => {
+        setAppsData(data);
+        setLoading(false);
+      })
+      .catch((error) => {
+        setLoading(false);
+        Alert.alert("Error", "No se pudo cargar la lista de apps");
+      });
+  }, []);
+
+  // Función para filtrar aplicaciones
+  const filterApps = (text) => {
+    if (!text.trim()) {
+      setFilteredApps([]);
+      return;
     }
+
+    const filtered = appsData.filter((app) => {
+      const appName = app.name?.toLowerCase() || "";
+      const appDeveloper = app.developer?.toLowerCase() || "";
+      const appCategory = app.category?.toLowerCase() || "";
+      const searchLower = text.toLowerCase();
+
+      return (
+        appName.includes(searchLower) ||
+        appDeveloper.includes(searchLower) ||
+        appCategory.includes(searchLower)
+      );
+    });
+
+    setFilteredApps(filtered);
   };
 
-  const renderSearchResult = ({ item }) => (
+  // Manejar cambio de texto en búsqueda
+  const handleSearchChange = (text) => {
+    setSearchText(text);
+    filterApps(text);
+  };
+
+  // Manejar selección de búsqueda reciente
+  const handleRecentSearch = (searchTerm) => {
+    setSearchText(searchTerm);
+    filterApps(searchTerm);
+  };
+
+  // Manejar selección de aplicación
+  const handleAppPress = (app) => {
+    // Agregar a búsquedas recientes si no existe
+    if (
+      !recentSearches.includes(searchText.toLowerCase()) &&
+      searchText.trim()
+    ) {
+      setRecentSearches((prev) => [
+        searchText.toLowerCase(),
+        ...prev.slice(0, 4),
+      ]);
+    }
+
+    navigation.navigate("AppDetails", { app });
+  };
+
+  // Limpiar búsqueda
+  const clearSearch = () => {
+    setSearchText("");
+    setFilteredApps([]);
+  };
+
+  // Renderizar item de aplicación
+  const renderAppItem = ({ item }) => (
     <TouchableOpacity
-      style={[styles.resultCard, { backgroundColor: theme.cardBackground }]}
+      style={[styles.appItem, { backgroundColor: theme.cardBackground }]}
+      onPress={() => handleAppPress(item)}
     >
       <Image source={{ uri: item.icon }} style={styles.appIcon} />
       <View style={styles.appInfo}>
         <Text style={[styles.appName, { color: theme.textColor }]}>
           {item.name}
         </Text>
-        <Text style={[styles.appDeveloper, { color: theme.textColor }]}>
+        <Text
+          style={[styles.appDeveloper, { color: theme.secondaryTextColor }]}
+        >
           {item.developer}
         </Text>
-        <View style={styles.ratingContainer}>
-          <Ionicons name="star" size={16} color="#FFD700" />
-          <Text style={[styles.rating, { color: theme.textColor }]}>
-            {item.rating}
-          </Text>
-          <Text style={[styles.downloads, { color: theme.textColor }]}>
-            • {item.downloads}
-          </Text>
-        </View>
+        <Text style={[styles.appCategory, { color: theme.primary }]}>
+          {getText(item.category?.toLowerCase())}
+        </Text>
       </View>
-      <TouchableOpacity style={styles.installButton}>
-        <Text style={styles.installButtonText}>{getText("install")}</Text>
-      </TouchableOpacity>
+      <View style={styles.appActions}>
+        <Text style={[styles.appRating, { color: theme.textColor }]}>
+          ⭐ {item.rating}
+        </Text>
+        <TouchableOpacity
+          style={[styles.installButton, { backgroundColor: theme.primary }]}
+        >
+          <Text style={styles.installButtonText}>{getText("install")}</Text>
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 
-  const popularSearches = [
-    "WhatsApp",
-    "Instagram",
-    "TikTok",
-    "Spotify",
-    "Netflix",
-  ];
+  // Renderizar búsqueda reciente
+  const renderRecentSearch = ({ item }) => (
+    <TouchableOpacity
+      style={[styles.recentItem, { borderBottomColor: theme.border }]}
+      onPress={() => handleRecentSearch(item)}
+    >
+      <Ionicons
+        name="time-outline"
+        size={20}
+        color={theme.secondaryTextColor}
+      />
+      <Text style={[styles.recentText, { color: theme.textColor }]}>
+        {item}
+      </Text>
+      <Ionicons
+        name="arrow-up-outline"
+        size={16}
+        color={theme.secondaryTextColor}
+      />
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text>Cargando apps...</Text>
+      </View>
+    );
+  }
 
   return (
     <View
       style={[styles.container, { backgroundColor: theme.backgroundColor }]}
     >
-      {/* Search Bar */}
+      {/* Header de búsqueda */}
       <View
-        style={[
-          styles.searchContainer,
-          { backgroundColor: theme.cardBackground },
-        ]}
+        style={[styles.searchHeader, { backgroundColor: theme.cardBackground }]}
       >
-        <Ionicons
-          name="search"
-          size={20}
-          color={theme.textColor}
-          style={styles.searchIcon}
-        />
-        <TextInput
-          style={[styles.searchInput, { color: theme.textColor }]}
-          placeholder={getText("searchApps")}
-          value={searchText}
-          onChangeText={handleSearch}
-          placeholderTextColor={theme.textColor}
-        />
-        {searchText.length > 0 && (
-          <TouchableOpacity onPress={() => handleSearch("")}>
-            <Ionicons name="close" size={20} color={theme.textColor} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Search Results */}
-      {searchResults.length > 0 ? (
-        <FlatList
-          data={searchResults}
-          renderItem={renderSearchResult}
-          keyExtractor={(item) => item.id.toString()}
-          showsVerticalScrollIndicator={false}
-          style={styles.resultsList}
-        />
-      ) : searchText.length > 0 ? (
-        <View style={styles.noResults}>
-          <Ionicons name="search" size={50} color="#ccc" />
-          <Text style={[styles.noResultsText, { color: theme.textColor }]}>
-            {getText("noResults")}
-          </Text>
-          <Text style={[styles.noResultsSubtext, { color: theme.textColor }]}>
-            {getText("tryOtherTerms")}
-          </Text>
-        </View>
-      ) : (
         <View
           style={[
-            styles.defaultView,
+            styles.searchContainer,
             { backgroundColor: theme.backgroundColor },
           ]}
         >
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-              {getText("popularSearches")}
-            </Text>
-            {popularSearches.map((search, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.popularSearch,
-                  { backgroundColor: theme.cardBackground },
-                ]}
-                onPress={() => handleSearch(search)}
-              >
-                <Ionicons
-                  name="trending-up"
-                  size={20}
-                  color={theme.textColor}
-                />
-                <Text
-                  style={[styles.popularSearchText, { color: theme.textColor }]}
-                >
-                  {search}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <Ionicons name="search" size={20} color={theme.secondaryTextColor} />
+          <TextInput
+            style={[styles.searchInput, { color: theme.textColor }]}
+            placeholder={getText("searchPlaceholder") || "Buscar juegos..."}
+            placeholderTextColor={theme.secondaryTextColor}
+            value={searchText}
+            onChangeText={handleSearchChange}
+            autoFocus={true}
+          />
+          {searchText.length > 0 && (
+            <TouchableOpacity onPress={clearSearch}>
+              <Ionicons
+                name="close-circle"
+                size={20}
+                color={theme.secondaryTextColor}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Contenido */}
+      {searchText.trim() === "" ? (
+        // Mostrar búsquedas recientes cuando no hay texto
+        <View style={styles.recentContainer}>
+          <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+            {getText("recentSearches") || "Búsquedas recientes"}
+          </Text>
+          <FlatList
+            data={recentSearches}
+            renderItem={renderRecentSearch}
+            keyExtractor={(item, index) => index.toString()}
+            showsVerticalScrollIndicator={false}
+          />
+        </View>
+      ) : filteredApps.length > 0 ? (
+        // Mostrar resultados de búsqueda
+        <View style={styles.resultsContainer}>
+          <Text
+            style={[styles.resultsCount, { color: theme.secondaryTextColor }]}
+          >
+            {filteredApps.length} {getText("results") || "resultados"} para "
+            {searchText}"
+          </Text>
+          <FlatList
+            data={filteredApps}
+            renderItem={renderAppItem}
+            keyExtractor={(item) => item.id.toString()}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.resultsList}
+          />
+        </View>
+      ) : (
+        // Mostrar mensaje de no resultados
+        <View style={styles.noResultsContainer}>
+          <Ionicons name="search" size={64} color={theme.secondaryTextColor} />
+          <Text style={[styles.noResultsTitle, { color: theme.textColor }]}>
+            {getText("noResults") || "Sin resultados"}
+          </Text>
+          <Text
+            style={[styles.noResultsText, { color: theme.secondaryTextColor }]}
+          >
+            {getText("noResultsDesc") ||
+              "No encontramos juegos que coincidan con tu búsqueda"}
+          </Text>
         </View>
       )}
     </View>
@@ -161,138 +249,117 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  searchHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    paddingTop: 50,
+  },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    margin: 15,
-    marginTop: 50,
     paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 25,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  searchIcon: {
-    marginRight: 10,
   },
   searchInput: {
     flex: 1,
+    marginLeft: 10,
     fontSize: 16,
-    color: "#333",
+  },
+  recentContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 15,
+  },
+  recentItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 0.5,
+  },
+  recentText: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 16,
+  },
+  resultsContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  resultsCount: {
+    fontSize: 14,
+    marginBottom: 15,
   },
   resultsList: {
-    flex: 1,
+    paddingBottom: 20,
   },
-  resultCard: {
+  appItem: {
     flexDirection: "row",
     alignItems: "center",
     padding: 15,
-    marginHorizontal: 15,
     marginBottom: 10,
-    borderRadius: 10,
-    elevation: 1,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    borderRadius: 12,
   },
   appIcon: {
     width: 50,
     height: 50,
-    borderRadius: 10,
-    marginRight: 15,
+    borderRadius: 12,
   },
   appInfo: {
     flex: 1,
+    marginLeft: 15,
   },
   appName: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333",
+    marginBottom: 2,
   },
   appDeveloper: {
-    fontSize: 14,
-    color: "#666",
-    marginVertical: 2,
+    fontSize: 13,
+    marginBottom: 2,
   },
-  ratingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+  appCategory: {
+    fontSize: 12,
+    fontWeight: "500",
   },
-  rating: {
-    marginLeft: 5,
-    fontSize: 14,
-    color: "#666",
+  appActions: {
+    alignItems: "flex-end",
   },
-  downloads: {
-    fontSize: 14,
-    color: "#666",
-    marginLeft: 5,
+  appRating: {
+    fontSize: 12,
+    marginBottom: 8,
   },
   installButton: {
-    backgroundColor: "#007AFF",
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   installButtonText: {
     color: "white",
+    fontSize: 12,
     fontWeight: "600",
   },
-  noResults: {
+  noResultsContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 40,
+    paddingHorizontal: 40,
+  },
+  noResultsTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginTop: 20,
+    marginBottom: 10,
   },
   noResultsText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#666",
-    marginTop: 15,
-  },
-  noResultsSubtext: {
     fontSize: 14,
-    color: "#999",
-    marginTop: 5,
     textAlign: "center",
-  },
-  defaultView: {
-    flex: 1,
-  },
-  section: {
-    margin: 15,
-    padding: 15,
-    borderRadius: 10,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 15,
-  },
-  popularSearch: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    marginBottom: 8,
-    borderRadius: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  popularSearchText: {
-    marginLeft: 10,
-    fontSize: 16,
-    color: "#333",
+    lineHeight: 20,
   },
 });

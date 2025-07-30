@@ -2,81 +2,67 @@ import React, { useState, useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-// Deshabilitar screens nativas para evitar crashes
 import { enableScreens } from "react-native-screens";
 enableScreens(false);
+
 import MainNavigator from "./src/navigation/MainNavigator";
 import AuthNavigator from "./src/navigation/AuthNavigator";
 import SplashScreen from "./src/components/SplashScreen";
 import { ThemeProvider } from "./src/context/ThemeContext";
+import { UserContext } from "./src/context/UserContext";
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [initialRoute, setInitialRoute] = useState("Home");
+  const [usuarioGlobal, setUsuarioGlobal] = useState(null);
 
-  // Función para cargar el estado guardado
-  const loadPersistedState = async () => {
-    try {
-      const savedRoute = await AsyncStorage.getItem("lastRoute");
-      const userToken = await AsyncStorage.getItem("userToken");
-
-      if (savedRoute) {
-        setInitialRoute(savedRoute);
-      }
-
-      // Si hay un token guardado, el usuario ya está autenticado
-      if (userToken) {
-        setIsAuthenticated(true);
-      }
-    } catch (error) {
-      console.log("Error loading persisted state:", error);
-    }
-  };
-
+  // Carga sesión
   useEffect(() => {
-    loadPersistedState();
+    AsyncStorage.getItem("usuario").then((stored) => {
+      if (stored) {
+        const u = JSON.parse(stored);
+        setUsuarioGlobal(u);
+        setIsAuthenticated(true);
+        setInitialRoute("Profile");
+      }
+      setIsLoading(false);
+    });
   }, []);
 
-  const handleSplashFinish = () => {
-    setIsLoading(false);
-  };
-
-  const handleLogin = async (userData) => {
-    try {
-      // Guardar token de usuario
-      await AsyncStorage.setItem("userToken", "user_logged_in");
-      await AsyncStorage.setItem("userData", JSON.stringify(userData));
-      setIsAuthenticated(true);
-    } catch (error) {
-      console.log("Error saving user data:", error);
-    }
+  const handleLogin = async (user) => {
+    setUsuarioGlobal(user);
+    await AsyncStorage.setItem("usuario", JSON.stringify(user));
+    setIsAuthenticated(true);
+    setInitialRoute("Profile");
   };
 
   const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem("userToken");
-      await AsyncStorage.removeItem("userData");
-      setIsAuthenticated(false);
-    } catch (error) {
-      console.log("Error logging out:", error);
-    }
+    await AsyncStorage.removeItem("usuario");
+    setUsuarioGlobal(null);
+    setIsAuthenticated(false);
+    setInitialRoute("Home");
   };
 
-  if (isLoading) {
-    return <SplashScreen onFinish={handleSplashFinish} />;
-  }
+  if (isLoading) return <SplashScreen />;
 
   return (
     <ThemeProvider>
-      <NavigationContainer>
-        {isAuthenticated ? (
-          <MainNavigator initialRoute={initialRoute} onLogout={handleLogout} />
-        ) : (
-          <AuthNavigator onLogin={handleLogin} />
-        )}
-        <StatusBar style="auto" />
-      </NavigationContainer>
+      <UserContext.Provider
+        value={{ usuario: usuarioGlobal, setUsuario: setUsuarioGlobal }}
+      >
+        <NavigationContainer>
+          {isAuthenticated ? (
+            <MainNavigator
+              initialRouteName={initialRoute}
+              onLogout={handleLogout}
+            />
+          ) : (
+            <AuthNavigator onLogin={handleLogin} />
+          )}
+          <StatusBar style="auto" />
+        </NavigationContainer>
+      </UserContext.Provider>
     </ThemeProvider>
   );
 }

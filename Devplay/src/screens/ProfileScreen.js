@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   Text,
@@ -8,23 +8,68 @@ import {
   TextInput,
   Modal,
   Alert,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
+import { UserContext } from "../context/UserContext";
 
-export default function ProfileScreen({ navigation, onLogout }) {
+export default function ProfileScreen({ navigation, route, onLogout }) {
   const { theme, getText, language } = useTheme();
+  const { usuario } = useContext(UserContext);
+  const userEmail = usuario?.correo || "";
   const [showMenu, setShowMenu] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [profileData, setProfileData] = useState({
-    name: "Usuario1",
-    phone: "+520 123456789",
-    email: "usuario1@example.com",
-    country: "México",
-  });
+  const [profileData, setProfileData] = useState(null);
 
+  // Obtener datos del usuario desde el backend
+  useEffect(() => {
+    if (userEmail) {
+      console.log("Usuario en contexto:", usuario);
+      console.log("Correo enviado al backend:", userEmail);
+      fetch(`http://10.0.0.11:3001/usuario/${userEmail}`)
+        .then((res) => {
+          console.log("Status:", res.status);
+          return res.json();
+        })
+        .then((data) => {
+          console.log("Perfil recibido:", data);
+          setProfileData(data);
+        })
+        .catch((err) => {
+          console.log("Error en fetch:", err);
+          setProfileData(null);
+        });
+    } else {
+      console.log("No se recibió correo en los parámetros de navegación.");
+    }
+  }, [userEmail]);
+
+  // Actualizar campos editables
   const handleInputChange = (field, value) => {
     setProfileData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Guardar cambios en el perfil (puedes conectar con tu backend aquí)
+  const handleSaveProfile = () => {
+    setIsEditing(false);
+    // Ejemplo de actualización (puedes modificar según tu API)
+    fetch(`http://10.0.0.11:3001/usuario/${profileData.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(profileData),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("Perfil recibido:", data);
+        setProfileData(data);
+      })
+      .then(() => {
+        Alert.alert(getText("success"), getText("profileUpdated"));
+      })
+      .catch(() => {
+        Alert.alert("Error", "No se pudo actualizar el perfil");
+      });
   };
 
   const handleEditProfile = () => {
@@ -32,14 +77,16 @@ export default function ProfileScreen({ navigation, onLogout }) {
     setShowMenu(false);
   };
 
-  const handleSaveProfile = () => {
-    setIsEditing(false);
-    Alert.alert(getText("success"), getText("profileUpdated"));
-  };
-
   const handleCancelEdit = () => {
     setIsEditing(false);
-    // Aquí podrías revertir los cambios si es necesario
+    // Opcional: recargar datos del usuario
+    if (userEmail) {
+      console.log("Correo enviado al backend:", userEmail);
+      fetch(`http://10.0.0.11:3001/usuario/${userEmail}`)
+        .then((res) => res.json())
+        .then((data) => setProfileData(data))
+        .catch(() => {});
+    }
   };
 
   const handleLogout = () => {
@@ -158,13 +205,57 @@ export default function ProfileScreen({ navigation, onLogout }) {
     </TouchableOpacity>
   );
 
+  // Renderizar avatar del usuario
+  const renderUserAvatar = () => {
+    if (profileData && profileData.avatar) {
+      return (
+        <Image source={{ uri: profileData.avatar }} style={styles.profilePic} />
+      );
+    } else if (profileData && profileData.nombre) {
+      // Iniciales si no hay avatar
+      const initials = profileData.nombre
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+      return (
+        <View style={[styles.profilePic, { backgroundColor: theme.primary }]}>
+          <Text style={styles.profilePicText}>{initials}</Text>
+        </View>
+      );
+    } else {
+      // Default
+      return (
+        <View style={[styles.profilePic, { backgroundColor: theme.primary }]}>
+          <Ionicons name="person" size={40} color="#fff" />
+        </View>
+      );
+    }
+  };
+
+  if (!profileData || profileData.error) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text>
+          {profileData?.error
+            ? "No se encontró el usuario"
+            : "Cargando perfil..."}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.backgroundColor }]}
     >
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.cardBackground }]}>
-        <TouchableOpacity style={styles.backButton}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
           <Ionicons name="chevron-back" size={24} color={theme.textColor} />
         </TouchableOpacity>
         <TouchableOpacity
@@ -189,11 +280,7 @@ export default function ProfileScreen({ navigation, onLogout }) {
         <Text style={[styles.profileTitle, { color: theme.textColor }]}>
           {getText("myProfile")}
         </Text>
-        <View style={styles.profilePicContainer}>
-          <View style={[styles.profilePic, { backgroundColor: theme.primary }]}>
-            <Text style={styles.profilePicText}>JD</Text>
-          </View>
-        </View>
+        <View style={styles.profilePicContainer}>{renderUserAvatar()}</View>
       </View>
 
       {/* Form Fields */}
@@ -214,11 +301,11 @@ export default function ProfileScreen({ navigation, onLogout }) {
               },
               !isEditing && styles.inputDisabled,
             ]}
-            value={profileData.name}
+            value={profileData.nombre || ""}
             placeholder={getText("name")}
             placeholderTextColor={theme.textTertiary}
             editable={isEditing}
-            onChangeText={(value) => handleInputChange("name", value)}
+            onChangeText={(value) => handleInputChange("nombre", value)}
           />
         </View>
 
@@ -236,12 +323,12 @@ export default function ProfileScreen({ navigation, onLogout }) {
               },
               !isEditing && styles.inputDisabled,
             ]}
-            value={profileData.phone}
+            value={profileData.telefono || ""}
             placeholder={getText("phone")}
             placeholderTextColor={theme.textTertiary}
             keyboardType="phone-pad"
             editable={isEditing}
-            onChangeText={(value) => handleInputChange("phone", value)}
+            onChangeText={(value) => handleInputChange("telefono", value)}
           />
         </View>
 
@@ -259,12 +346,11 @@ export default function ProfileScreen({ navigation, onLogout }) {
               },
               !isEditing && styles.inputDisabled,
             ]}
-            value={profileData.email}
+            value={profileData.correo || ""}
             placeholder={getText("email")}
             placeholderTextColor={theme.textTertiary}
             keyboardType="email-address"
-            editable={isEditing}
-            onChangeText={(value) => handleInputChange("email", value)}
+            editable={false}
           />
         </View>
 
@@ -281,9 +367,12 @@ export default function ProfileScreen({ navigation, onLogout }) {
                   borderColor: theme.border,
                 },
               ]}
+              disabled={!isEditing}
             >
               <Text style={[styles.dateText, { color: theme.textColor }]}>
-                12/12/96
+                {profileData.fecha_nacimiento
+                  ? profileData.fecha_nacimiento
+                  : "Selecciona fecha"}
               </Text>
               <Ionicons
                 name="calendar-outline"
@@ -304,9 +393,10 @@ export default function ProfileScreen({ navigation, onLogout }) {
                   borderColor: theme.border,
                 },
               ]}
+              disabled={!isEditing}
             >
               <Text style={[styles.selectText, { color: theme.textColor }]}>
-                {language === "es" ? "Hombre" : "Male"}
+                {profileData.genero || "Sin especificar"}
               </Text>
               <Ionicons name="chevron-down" size={20} color={theme.iconColor} />
             </TouchableOpacity>
@@ -325,9 +415,10 @@ export default function ProfileScreen({ navigation, onLogout }) {
                 borderColor: theme.border,
               },
             ]}
+            disabled={!isEditing}
           >
             <Text style={[styles.selectText, { color: theme.textColor }]}>
-              México
+              {profileData.pais || "Sin especificar"}
             </Text>
             <Ionicons name="chevron-down" size={20} color={theme.iconColor} />
           </TouchableOpacity>
@@ -346,9 +437,11 @@ export default function ProfileScreen({ navigation, onLogout }) {
                 borderColor: theme.border,
               },
             ]}
-            value="El Rosario, 762, Santiago de Querétaro, Qro."
+            value={profileData.direccion || ""}
             placeholder={language === "es" ? "Dirección" : "Address"}
             multiline
+            editable={isEditing}
+            onChangeText={(value) => handleInputChange("direccion", value)}
           />
         </View>
       </View>
@@ -487,6 +580,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#333",
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
   },
   profilePicText: {
     color: "white",

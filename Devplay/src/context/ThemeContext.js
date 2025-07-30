@@ -89,10 +89,10 @@ export const ThemeProvider = ({ children }) => {
       installing: "Instalando",
 
       // Search Screen
-      searchApps: "Buscar aplicaciones...",
-      noResults: "No se encontraron resultados",
-      tryOtherTerms: "Prueba con otros términos de búsqueda",
-      popularSearches: "Búsquedas populares",
+      searchPlaceholder: "Buscar juegos...",
+      recentSearches: "Búsquedas recientes",
+      results: "resultados",
+      noResultsDesc: "No encontramos juegos que coincidan con tu búsqueda",
 
       // App Details Screen
       description: "Descripción",
@@ -321,10 +321,10 @@ export const ThemeProvider = ({ children }) => {
       installing: "Installing",
 
       // Search Screen
-      searchApps: "Search applications...",
-      noResults: "No results found",
-      tryOtherTerms: "Try other search terms",
-      popularSearches: "Popular Searches",
+      searchPlaceholder: "Search games...",
+      recentSearches: "Recent searches",
+      results: "results",
+      noResultsDesc: "We couldn't find games matching your search",
 
       // App Details Screen
       description: "Description",

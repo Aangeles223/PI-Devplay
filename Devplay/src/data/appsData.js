@@ -1019,10 +1019,12 @@ export const appsData = [
     rating: 4.4,
     downloads: "100M+",
     size: "78MB",
-    icon: require("../../assets/imagen1.jpg"),
+    icon: require("../../assets/games/need-for-speed/icon.webp"),
     screenshots: [
-      require("../../assets/imagen1.jpg"),
-      require("../../assets/imagen2.jpg"),
+      require("../../assets/games/need-for-speed/OIP.webp"),
+      require("../../assets/games/need-for-speed/OIP (1).webp"),
+      require("../../assets/games/need-for-speed/OIP (2).webp"),
+      require("../../assets/games/need-for-speed/OIP (3).webp"),
     ],
     description: {
       es: "Vive la experiencia definitiva de carreras callejeras con los coches más rápidos.",
