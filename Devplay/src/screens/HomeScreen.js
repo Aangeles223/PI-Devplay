@@ -13,239 +13,286 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import AppCard from "../components/AppCard";
+// import staticApps fallback (not needed for HomeScreen now)
+import { useNavigation, useRoute } from "@react-navigation/native";
 
-export default function HomeScreen({ navigation, route }) {
-  const { theme, getText, language } = useTheme();
+export default function HomeScreen() {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { theme, getText } = useTheme();
 
-  // Usuario logueado (correo)
-  const userEmail = route?.params?.usuario?.correo || null;
-  const [userData, setUserData] = useState(null);
-
-  // Estados para apps desde backend
   const [appsData, setAppsData] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Estados para la búsqueda
-  const [searchText, setSearchText] = useState("");
-  const [showSearchResults, setShowSearchResults] = useState(false);
-  const [searchResults, setSearchResults] = useState([]);
+  // añade este estado:
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
-  // Obtener apps al montar
+  // estados para la búsqueda
+  const [searchText, setSearchText] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
+  const handleSearch = (text) => {
+    setSearchText(text);
+    // aquí filtras según tu lógica o haces un fetch
+    const results = appsData.filter((app) =>
+      app.name.toLowerCase().includes(text.toLowerCase())
+    );
+    setSearchResults(results);
+  };
+
+  const clearSearch = () => {
+    setSearchText("");
+    setSearchResults([]);
+    setShowSearchResults(false);
+  };
+
+  const goToSearch = () => {
+    navigation.navigate("Search", { query: searchText });
+  };
+
+  const handleSearchFocus = () => {
+    setIsSearchFocused(true);
+    setShowSearchResults(true);
+  };
+  const handleSearchBlur = () => {
+    setIsSearchFocused(false);
+    // si quieres ocultar al perder foco:
+    // setShowSearchResults(false);
+  };
+
+  // Al montar, carga los datos estáticos y desactiva el loading
   useEffect(() => {
+    // 1) Cargamos apps
+    // Cargamos apps desde API
     fetch("http://10.0.0.11:3001/apps")
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data)) {
-          setAppsData(data);
-        } else {
+        if (!Array.isArray(data)) {
+          console.error("Error: appsData no es un arreglo:", data);
           setAppsData([]);
+        } else {
+          setAppsData(data);
         }
         setLoading(false);
       })
-      .catch((error) => {
-        setAppsData([]);
-        setLoading(false);
-        Alert.alert("Error", "No se pudo cargar la lista de apps");
+      .catch(() => setLoading(false));
+
+    // 2) Cargamos categorías y formateamos con validación
+    fetch("http://10.0.0.11:3001/categorias")
+      .then((res) => {
+        if (!res.ok) {
+          // Leer el mensaje de error devuelto por el servidor
+          return res.json().then((err) => {
+            console.error(
+              `Error al cargar categorías (servidor): ${err.error || err}`
+            );
+            return [];
+          });
+        }
+        return res.json();
+      })
+      .then((cats) => {
+        if (!Array.isArray(cats)) {
+          console.error("Error: categorías no es un arreglo:", cats);
+          setCategories([]);
+          return;
+        }
+        // Mapear campos de BD a id y name
+        const formatted = cats.map((c) => ({
+          id: c.id_categoria || c.id || c.id_cat,
+          name: c.nombre || c.name || c.nombre_categoria,
+        }));
+        setCategories(formatted);
+      })
+      .catch((err) => {
+        console.error("Error al cargar categorías:", err);
+        setCategories([]);
       });
+
+    // 3) Cargamos datos de usuario
+    const loadUserData = async () => {
+      try {
+        const userJson = await AsyncStorage.getItem("userData");
+        const user = userJson != null ? JSON.parse(userJson) : null;
+        setUserData(user);
+      } catch (e) {
+        console.error("Error al cargar datos de usuario:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserData();
   }, []);
 
-  // Obtener datos del usuario logueado
-  useEffect(() => {
-    if (userEmail) {
-      fetch(`http://10.0.0.11:3001/usuario/${userEmail}`)
-        .then((res) => res.json())
-        .then((data) => {
-          setUserData(data);
-        })
-        .catch(() => setUserData(null));
-    }
-  }, [userEmail]);
-
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text>Cargando apps...</Text>
-      </View>
-    );
-  }
-
-  // Función para cerrar sesión
-  const handleLogout = async () => {
-    Alert.alert("Cerrar sesión", "¿Seguro que quieres salir?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Salir",
-        style: "destructive",
-        onPress: async () => {
-          await AsyncStorage.removeItem("userToken");
-          navigation.navigate("Login"); // Usa navigate en vez de reset
-        },
-      },
-    ]);
-  };
-
-  // Render avatar del usuario con botón de logout
+  // renderizador de avatar de usuario
   const renderUserAvatar = () => (
-    <View style={{ flexDirection: "row", alignItems: "center" }}>
-      {/* Avatar */}
-      {userData && userData.avatar ? (
+    <TouchableOpacity onPress={() => navigation.navigate("Profile")}>
+      {userData?.avatar ? (
         <Image source={{ uri: userData.avatar }} style={styles.profilePic} />
-      ) : userData && userData.nombre ? (
-        <View style={styles.profilePic}>
-          <Text style={styles.profileText}>
-            {userData.nombre
-              .split(" ")
-              .map((n) => n[0])
-              .join("")
-              .toUpperCase()
-              .slice(0, 2)}
-          </Text>
-        </View>
       ) : (
-        <View style={styles.profilePic}>
-          <Ionicons name="person" size={24} color="#fff" />
-        </View>
+        <Ionicons
+          name="person-circle-outline"
+          size={40}
+          color={theme.textColor}
+        />
       )}
-    </View>
+    </TouchableOpacity>
   );
 
-  // Categorías con más opciones
-  const categories = [
-    {
-      id: 1,
-      name: getText("action"),
-      icon: "game-controller",
-      bgColor: "#FFEBEE",
-      color: "#FF5252",
-      category: "Acción",
-    },
-    {
-      id: 2,
-      name: getText("adventure"),
-      icon: "compass",
-      bgColor: "#E8F5E8",
-      color: "#4CAF50",
-      category: "Aventura",
-    },
-    {
-      id: 3,
-      name: getText("strategy"),
-      icon: "extension-puzzle",
-      bgColor: "#E3F2FD",
-      color: "#2196F3",
-      category: "Estrategia",
-    },
-    {
-      id: 4,
-      name: getText("sports"),
-      icon: "football",
-      bgColor: "#FFF3E0",
-      color: "#FF5722",
-      category: "Deportes",
-    },
-  ];
+  // renderizador de juego en tendencia
+  const renderTrendingGame = ({ item }) => (
+    <TouchableOpacity
+      style={styles.trendingCard}
+      onPress={() => navigation.navigate("AppDetails", { app: item })}
+    >
+      <Image source={{ uri: item.icon }} style={styles.trendingImage} />
+      <View style={styles.trendingOverlay}>
+        <View style={styles.ratingBadge}>
+          <Text style={styles.ratingText}>{item.rating?.toFixed(1) || ""}</Text>
+        </View>
+        <View style={styles.trendingInfo}>
+          <Text style={styles.trendingTitle}>{item.name}</Text>
+          <Text style={styles.trendingDeveloper}>{item.developer}</Text>
+          <TouchableOpacity style={styles.installButtonSmall}>
+            <Text style={styles.installButtonTextSmall}>
+              {getText("install") || "Instalar"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 
-  // Filtros de apps
-  const featuredApps = appsData.filter((app) => app.isFeatured);
-  const trendingGames = appsData.slice(0, 4);
-  const newReleases = appsData.slice(2, 6);
-  const offers = appsData.filter((app) => app.isOnSale).slice(0, 4);
-  const freeGames = appsData.filter((app) => app.isFree).slice(0, 4);
-  const topFreeGames = appsData
-    .filter((app) => app.isFree && app.rating >= 4.5)
-    .slice(0, 4);
-  const multiplayerGames = appsData
-    .filter((app) => app.isMultiplayer)
-    .slice(0, 4);
-  const topPaidGames = appsData
-    .filter((app) => app.isPremium && app.rating >= 4.5)
-    .slice(0, 4);
-  const offlineGames = appsData.filter((app) => app.isOffline).slice(0, 4);
+  // renderizador de tarjeta de juego para otras secciones
+  const renderGameCard = ({ item }) => {
+    // Mostrar precio directamente desde la API
+    const formattedPrice = item.price || getText("free") || "";
 
-  // Función de búsqueda mejorada
-  const handleSearch = (text) => {
-    setSearchText(text);
+    // Fallback para imagen
+    const imageSource = item.icon
+      ? { uri: item.icon }
+      : require("../../assets/icon.png");
 
-    if (text.trim().length > 0) {
-      const filtered = appsData.filter((app) => {
-        const appName = app.name?.toLowerCase() || "";
-        const appDeveloper = app.developer?.toLowerCase() || "";
-        const appCategory = app.category?.toLowerCase() || "";
-        const searchLower = text.toLowerCase();
-
-        return (
-          appName.includes(searchLower) ||
-          appDeveloper.includes(searchLower) ||
-          appCategory.includes(searchLower)
-        );
-      });
-
-      setSearchResults(filtered.slice(0, 5));
-      setShowSearchResults(true);
-    } else {
-      setShowSearchResults(false);
-      setSearchResults([]);
-    }
+    return (
+      <TouchableOpacity
+        style={[
+          styles.cardContainer,
+          {
+            backgroundColor: theme.cardBackground,
+            borderWidth: 1,
+            borderColor: theme.border,
+            elevation: 4,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.2,
+            shadowRadius: 3,
+            padding: 8,
+          },
+        ]}
+        onPress={() => navigation.navigate("AppDetails", { app: item })}
+      >
+        <Image source={imageSource} style={styles.cardImage} />
+        <View style={[styles.cardContent, { paddingHorizontal: 4 }]}>
+          <Text
+            style={[styles.cardTitle, { color: theme.textColor }]}
+            numberOfLines={1}
+          >
+            {item.name}
+          </Text>
+          <Text
+            style={[styles.cardSubtitle, { color: theme.secondaryTextColor }]}
+            numberOfLines={1}
+          >
+            {item.developer}
+          </Text>
+          {/* Category badge */}
+          {item.category && (
+            <View
+              style={[styles.categoryLabel, { backgroundColor: theme.primary }]}
+            >
+              <Text style={styles.categoryLabelText} numberOfLines={1}>
+                {item.category}
+              </Text>
+            </View>
+          )}
+          {/* Subinfo: Age rating y tamaño */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginTop: 4,
+            }}
+          >
+            <Ionicons
+              name="alert-circle-outline"
+              size={12}
+              color={theme.primary}
+            />
+            <Text
+              style={[
+                styles.subInfoText,
+                { color: theme.secondaryTextColor, marginLeft: 4 },
+              ]}
+            >
+              {item.ageRating}
+            </Text>
+            <Ionicons
+              name="download-outline"
+              size={12}
+              color={theme.primary}
+              style={{ marginLeft: 12 }}
+            />
+            <Text
+              style={[
+                styles.subInfoText,
+                { color: theme.secondaryTextColor, marginLeft: 4 },
+              ]}
+            >
+              {item.size}
+            </Text>
+          </View>
+          <View style={[styles.cardFooter, { paddingTop: 4 }]}>
+            {/* Mostrar precio fijo */}
+            <Text style={styles.salePrice}>{formattedPrice}</Text>
+            <TouchableOpacity
+              style={[
+                styles.installButton,
+                {
+                  marginLeft: "auto",
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                },
+              ]}
+            >
+              <Text style={styles.installButtonText}>
+                {getText("install") || "Instalar"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
-  // Navegar a pantalla de búsqueda completa
-  const goToSearch = () => {
-    setSearchText("");
-    setShowSearchResults(false);
-    setSearchResults([]);
-    setIsSearchFocused(false);
-    navigation.navigate("Search");
-  };
-
-  // Limpiar búsqueda
-  const clearSearch = () => {
-    setSearchText("");
-    setShowSearchResults(false);
-    setSearchResults([]);
-  };
-
-  // Manejar focus del input
-  const handleSearchFocus = () => {
-    setIsSearchFocused(true);
-    if (searchText.trim().length > 0) {
-      setShowSearchResults(true);
-    }
-  };
-
-  // Manejar blur del input
-  const handleSearchBlur = () => {
-    setIsSearchFocused(false);
-    setTimeout(() => {
-      if (!isSearchFocused) {
-        setShowSearchResults(false);
-      }
-    }, 200);
-  };
-
-  // Seleccionar resultado de búsqueda
-  const selectSearchResult = (app) => {
-    setShowSearchResults(false);
-    setSearchText("");
-    setIsSearchFocused(false);
-    navigation.navigate("AppDetails", { app });
-  };
-
-  // Renderizar resultado de búsqueda
+  // renderizador de resultados de búsqueda
   const renderSearchResult = (app) => (
     <TouchableOpacity
       key={app.id}
       style={[
         styles.searchResultItem,
-        {
-          backgroundColor: theme.cardBackground,
-          borderBottomColor: theme.border,
-        },
+        { backgroundColor: theme.cardBackground },
       ]}
-      onPress={() => selectSearchResult(app)}
-      activeOpacity={0.7}
+      onPress={() => navigation.navigate("AppDetails", { app })}
     >
-      <Image source={{ uri: app.icon }} style={styles.searchResultIcon} />
+      <Image
+        source={app.icon ? { uri: app.icon } : require("../../assets/icon.png")}
+        style={styles.searchResultIcon}
+      />
       <View style={styles.searchResultInfo}>
         <Text style={[styles.searchResultName, { color: theme.textColor }]}>
           {app.name}
@@ -253,129 +300,132 @@ export default function HomeScreen({ navigation, route }) {
         <Text
           style={[
             styles.searchResultDeveloper,
-            { color: theme.secondaryTextColor },
+            { color: theme.secondaryTextColor || theme.textSecondary },
           ]}
         >
           {app.developer}
         </Text>
-        <Text style={[styles.searchResultCategory, { color: theme.primary }]}>
-          {getText(app.category?.toLowerCase())}
+      </View>
+      <TouchableOpacity style={styles.miniInstallButton}>
+        <Text style={styles.miniInstallButtonText}>
+          {getText("install") || "Instalar"}
         </Text>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loader}>
+        <Text>{getText("loading") || "Cargando…"}</Text>
       </View>
-      <View style={styles.searchResultActions}>
-        <Text style={[styles.searchResultRating, { color: theme.textColor }]}>
-          ⭐ {app.rating}
+    );
+  }
+
+  // Fallback dinámico de categorías si BD no respondió
+  const categoryList =
+    categories.length > 0
+      ? categories
+      : Array.from(new Set(appsData.map((app) => app.category)))
+          .filter((c) => c)
+          .map((name) => ({ id: name, name }));
+  // Icons and colors per category
+  const categoryIconMap = {
+    Acción: "flash",
+    Aventura: "map",
+    Puzzle: "help-circle",
+    Arcade: "game-controller",
+    RPG: "body",
+    Estrategia: "analytics",
+    Deportes: "football",
+    Carreras: "car",
+  };
+  const categoryColorMap = {
+    Acción: "#E74C3C",
+    Aventura: "#3498DB",
+    Puzzle: "#9B59B6",
+    Arcade: "#F1C40F",
+    RPG: "#1ABC9C",
+    Estrategia: "#E67E22",
+    Deportes: "#2ECC71",
+    Carreras: "#E84393",
+  };
+  const renderCategory = ({ item }) => {
+    const iconName = categoryIconMap[item.name] || "apps";
+    const bgColor = categoryColorMap[item.name] || theme.primary;
+    return (
+      <TouchableOpacity
+        style={[
+          styles.categoryChip,
+          { backgroundColor: bgColor, borderColor: bgColor },
+        ]}
+        onPress={() =>
+          navigation.navigate("Categories", {
+            categoryId: item.id,
+            categoryName: item.name,
+          })
+        }
+      >
+        <Ionicons
+          name={iconName}
+          size={16}
+          color="#fff"
+          style={{ marginRight: 6 }}
+        />
+        <Text style={[styles.categoryText, { color: "#fff" }]}>
+          {item.name}
         </Text>
-        <TouchableOpacity
-          style={[styles.miniInstallButton, { backgroundColor: theme.primary }]}
-          onPress={() => handleInstallPress(app)}
-        >
-          <Text style={styles.miniInstallButtonText}>
-            {app.isFree ? getText("install") : "$"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const handleCategoryPress = (category) => {
-    navigation.navigate("Categories", {
-      categoryName: category.name,
-      categoryFilter: category.category,
-    });
+      </TouchableOpacity>
+    );
+  };
+  // Acción para 'Ver más' en las secciones
+  const handleSeeMorePress = (sectionTitle, data) => {
+    Alert.alert(sectionTitle, getText("seeMoreDesc") || "Ver más juegos", [
+      { text: getText("ok") || "Aceptar" },
+    ]);
   };
 
-  const handleSeeMorePress = (sectionTitle, gamesData) => {
-    navigation.navigate("Categories", {
-      categoryName: sectionTitle,
-      gamesData: gamesData,
-    });
-  };
-
-  const handleInstallPress = (app) => {
-    alert(`${getText("installing")} ${app.name}...`);
-  };
-
-  const handleAppPress = (app) => {
-    navigation.navigate("AppDetails", { app });
-  };
-
-  const renderCategory = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.categoryChip, { backgroundColor: item.bgColor }]}
-      onPress={() => handleCategoryPress(item)}
-    >
-      <Ionicons name={item.icon} size={16} color={item.color} />
-      <Text style={[styles.categoryText, { color: item.color }]}>
-        {item.name}
-      </Text>
-    </TouchableOpacity>
+  // Filtros para las secciones
+  // Mostrar todos los juegos en cada sección si no hay filtro
+  const trendingGames = appsData || [];
+  const newReleases = appsData || [];
+  // Ofertas: solo juegos de pago que estén en oferta
+  const offers = (appsData || []).filter(
+    (app) => app.isOnSale && app.isPremium
   );
+  // Clasificar juegos gratuitos y de pago usando flags de la API
+  // Solo apps con la palabra 'gratis' en el campo price
+  const freeList = (appsData || []).filter((app) => {
+    const priceText =
+      app.price != null ? app.price.toString().trim().toLowerCase() : "";
+    return priceText.includes("gratis");
+  });
+  const paidList = (appsData || []).filter((app) => app.isPremium);
+  const topFreeList = freeList.filter((app) => app.rating >= 4.5);
+  const topPaidList = paidList.filter((app) => app.rating >= 4.5);
+  const multiList = (appsData || []).filter((app) => app.isMultiplayer);
+  const offlineList = (appsData || []).filter((app) => app.isOffline);
 
-  const renderTrendingGame = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.trendingCard, { backgroundColor: theme.cardBackground }]}
-      onPress={() => handleAppPress(item)}
-    >
-      <Image source={{ uri: item.icon }} style={styles.trendingImage} />
-      <View style={styles.trendingOverlay}>
-        <View style={styles.ratingBadge}>
-          <Text style={styles.ratingText}>{item.rating}</Text>
-        </View>
-        <View style={styles.trendingInfo}>
-          <Text style={styles.trendingTitle}>{item.name}</Text>
-          <Text style={styles.trendingDeveloper}>{item.developer}</Text>
-          <TouchableOpacity
-            style={styles.installButtonSmall}
-            onPress={() => handleInstallPress(item)}
-          >
-            <Text style={styles.installButtonTextSmall}>
-              {getText("install")}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderGameCard = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.gameCard, { backgroundColor: theme.cardBackground }]}
-      onPress={() => handleAppPress(item)}
-    >
-      <Image source={{ uri: item.icon }} style={styles.gameImage} />
-      <View style={styles.gameOverlay}>
-        <View style={styles.ratingBadge}>
-          <Text style={styles.ratingText}>{item.rating}</Text>
-        </View>
-        <View style={styles.gameInfo}>
-          <Text style={styles.gameTitle}>{item.name}</Text>
-          <Text style={styles.gameDeveloper}>{item.developer}</Text>
-          {item.isOnSale && (
-            <View style={styles.priceContainer}>
-              <Text style={styles.originalPrice}>{item.originalPrice}</Text>
-              <Text style={styles.salePrice}>{item.salePrice}</Text>
-            </View>
-          )}
-          <TouchableOpacity
-            style={[
-              styles.installButtonSmall,
-              item.isFree ? {} : styles.paidButton,
-            ]}
-            onPress={() => handleInstallPress(item)}
-          >
-            <Text style={styles.installButtonTextSmall}>
-              {item.isFree
-                ? getText("install")
-                : item.isOnSale
-                ? item.salePrice
-                : item.originalPrice || getText("install")}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+  // Fallback de secciones: si el filtro no arroja resultados, mostramos todos o estáticos
+  // Solo juegos de pago en oferta
+  // Juegos en oferta
+  // Ofertas: si no hay, mostrar solo juegos de pago
+  const offersList = offers.length > 0 ? offers : paidList;
+  // Solo juegos gratuitos
+  const freeListSafe = freeList;
+  // Solo juegos de pago
+  const paidListSafe = paidList;
+  // Solo top juegos gratuitos: si no hay, mostrar solo juegos gratuitos
+  const topFreeListSafe = topFreeList.length > 0 ? topFreeList : freeList;
+  // Solo top juegos de pago: si no hay, mostrar solo juegos de pago
+  const topPaidListSafe = topPaidList.length > 0 ? topPaidList : paidList;
+  // Solo juegos multijugador
+  const multiListSafe = multiList;
+  // Solo juegos sin conexión
+  // Sin conexión: si no hay, mostrar todas las apps
+  const offlineListSafe = offlineList.length > 0 ? offlineList : appsData;
+  // Fallback de categorías si la API no respondió
+  // Eliminamos fallback, usamos solo categorías de la BD
 
   return (
     <View
@@ -387,6 +437,7 @@ export default function HomeScreen({ navigation, route }) {
           style={[styles.header, { backgroundColor: theme.cardBackground }]}
         >
           <View style={styles.profileSection}>
+            {/* Avatar y nombre de usuario */}
             {renderUserAvatar()}
             <View style={styles.coinsSection}>
               <Ionicons name="trophy" size={16} color="#FF6B6B" />
@@ -524,9 +575,9 @@ export default function HomeScreen({ navigation, route }) {
             {getText("categories")}
           </Text>
           <FlatList
-            data={categories}
+            data={categoryList}
             renderItem={renderCategory}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(cat) => cat.id.toString()}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.categoriesList}
@@ -554,11 +605,11 @@ export default function HomeScreen({ navigation, route }) {
           </View>
           <FlatList
             data={trendingGames}
-            renderItem={renderTrendingGame}
+            renderItem={renderGameCard}
             keyExtractor={(item) => item.id.toString()}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.trendingList}
+            contentContainerStyle={styles.newReleasesList}
           />
         </View>
 
@@ -598,7 +649,7 @@ export default function HomeScreen({ navigation, route }) {
               {getText("offers")}
             </Text>
             <TouchableOpacity
-              onPress={() => handleSeeMorePress("Offers", offers)}
+              onPress={() => handleSeeMorePress("Offers", offersList)}
             >
               <Text
                 style={[
@@ -611,7 +662,7 @@ export default function HomeScreen({ navigation, route }) {
             </TouchableOpacity>
           </View>
           <FlatList
-            data={offers}
+            data={offersList}
             renderItem={renderGameCard}
             keyExtractor={(item) => item.id.toString()}
             horizontal
@@ -627,7 +678,7 @@ export default function HomeScreen({ navigation, route }) {
               {getText("freeGames")}
             </Text>
             <TouchableOpacity
-              onPress={() => handleSeeMorePress("Free Games", freeGames)}
+              onPress={() => handleSeeMorePress("Free Games", freeListSafe)}
             >
               <Text
                 style={[
@@ -640,7 +691,7 @@ export default function HomeScreen({ navigation, route }) {
             </TouchableOpacity>
           </View>
           <FlatList
-            data={freeGames}
+            data={freeListSafe}
             renderItem={renderGameCard}
             keyExtractor={(item) => item.id.toString()}
             horizontal
@@ -656,7 +707,9 @@ export default function HomeScreen({ navigation, route }) {
               {getText("topFreeGames")}
             </Text>
             <TouchableOpacity
-              onPress={() => handleSeeMorePress("Top Free Games", topFreeGames)}
+              onPress={() =>
+                handleSeeMorePress("Top Free Games", topFreeListSafe)
+              }
             >
               <Text
                 style={[
@@ -669,7 +722,7 @@ export default function HomeScreen({ navigation, route }) {
             </TouchableOpacity>
           </View>
           <FlatList
-            data={topFreeGames}
+            data={topFreeListSafe}
             renderItem={renderGameCard}
             keyExtractor={(item) => item.id.toString()}
             horizontal
@@ -685,9 +738,7 @@ export default function HomeScreen({ navigation, route }) {
               {getText("multiplayer")}
             </Text>
             <TouchableOpacity
-              onPress={() =>
-                handleSeeMorePress("Multiplayer", multiplayerGames)
-              }
+              onPress={() => handleSeeMorePress("Multiplayer", multiListSafe)}
             >
               <Text
                 style={[
@@ -700,7 +751,7 @@ export default function HomeScreen({ navigation, route }) {
             </TouchableOpacity>
           </View>
           <FlatList
-            data={multiplayerGames}
+            data={multiListSafe}
             renderItem={renderGameCard}
             keyExtractor={(item) => item.id.toString()}
             horizontal
@@ -716,7 +767,9 @@ export default function HomeScreen({ navigation, route }) {
               {getText("topPaidGames")}
             </Text>
             <TouchableOpacity
-              onPress={() => handleSeeMorePress("Top Paid Games", topPaidGames)}
+              onPress={() =>
+                handleSeeMorePress("Top Paid Games", topPaidListSafe)
+              }
             >
               <Text
                 style={[
@@ -729,7 +782,7 @@ export default function HomeScreen({ navigation, route }) {
             </TouchableOpacity>
           </View>
           <FlatList
-            data={topPaidGames}
+            data={topPaidListSafe}
             renderItem={renderGameCard}
             keyExtractor={(item) => item.id.toString()}
             horizontal
@@ -745,7 +798,9 @@ export default function HomeScreen({ navigation, route }) {
               {getText("offlineGames")}
             </Text>
             <TouchableOpacity
-              onPress={() => handleSeeMorePress("Offline Games", offlineGames)}
+              onPress={() =>
+                handleSeeMorePress("Offline Games", offlineListSafe)
+              }
             >
               <Text
                 style={[
@@ -758,7 +813,7 @@ export default function HomeScreen({ navigation, route }) {
             </TouchableOpacity>
           </View>
           <FlatList
-            data={offlineGames}
+            data={offlineListSafe}
             renderItem={renderGameCard}
             keyExtractor={(item) => item.id.toString()}
             horizontal
@@ -835,246 +890,140 @@ const styles = StyleSheet.create({
   },
   advancedSearchButton: {
     marginLeft: 8,
-    padding: 4,
-  },
-  searchResults: {
-    position: "absolute",
-    top: 55,
-    left: 0,
-    right: 0,
-    borderRadius: 12,
-    maxHeight: 350,
-    zIndex: 1000,
-    elevation: 10,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-  },
-  searchResultItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderBottomWidth: 0.5,
-  },
-  searchResultIcon: {
-    width: 45,
-    height: 45,
-    borderRadius: 10,
-  },
-  searchResultInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  searchResultName: {
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-  searchResultDeveloper: {
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  searchResultCategory: {
-    fontSize: 11,
-    fontWeight: "500",
-  },
-  searchResultActions: {
-    alignItems: "flex-end",
-  },
-  searchResultRating: {
-    fontSize: 11,
-    marginBottom: 6,
-  },
-  miniInstallButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    minWidth: 50,
-    alignItems: "center",
-  },
-  miniInstallButtonText: {
-    color: "white",
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  seeAllResults: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 12,
-    borderTopWidth: 0.5,
-  },
-  seeAllText: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginRight: 6,
-  },
-  noResultsDropdown: {
-    position: "absolute",
-    top: 55,
-    left: 0,
-    right: 0,
-    borderRadius: 12,
-    padding: 20,
-    zIndex: 1000,
-    elevation: 10,
-    alignItems: "center",
-  },
-  noResultsText: {
-    fontSize: 14,
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  searchAllButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  searchAllButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
+    padding: 8, // <— concreta un valor para 'padding'
   },
   section: {
     marginTop: 20,
     paddingHorizontal: 20,
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 10,
+  },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 15,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  seeMoreText: {
-    fontSize: 14,
+    marginBottom: 10,
   },
   categoriesList: {
     paddingRight: 20,
   },
+  trendingList: {
+    paddingLeft: 20,
+    paddingBottom: 10,
+  },
   categoryChip: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
+    borderRadius: 15,
     paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 12,
+    paddingHorizontal: 12,
+    marginRight: 10,
   },
   categoryText: {
-    marginLeft: 6,
-    fontSize: 14,
     fontWeight: "500",
   },
-  trendingList: {
-    paddingRight: 20,
-  },
   trendingCard: {
-    width: 160,
-    height: 200,
-    marginRight: 15,
+    width: 140,
     borderRadius: 12,
+    marginRight: 16,
+    marginVertical: 8,
     overflow: "hidden",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    elevation: 4,
   },
   trendingImage: {
     width: "100%",
-    height: "100%",
-    position: "absolute",
+    height: 100,
+    resizeMode: "cover",
   },
   trendingOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    padding: 12,
-    justifyContent: "space-between",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "flex-end",
+    padding: 10,
   },
   ratingBadge: {
-    alignSelf: "flex-end",
-    backgroundColor: "rgba(255,255,255,0.9)",
-    paddingHorizontal: 8,
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "#000",
+    borderRadius: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 8,
   },
   ratingText: {
+    color: "#fff",
+    fontWeight: "500",
     fontSize: 12,
-    fontWeight: "600",
-    color: "#333",
   },
   trendingInfo: {
-    alignItems: "flex-start",
+    backgroundColor: "#000",
+    borderRadius: 10,
+    padding: 10,
   },
   trendingTitle: {
-    color: "white",
-    fontSize: 16,
+    color: "#fff",
     fontWeight: "600",
+    fontSize: 14,
     marginBottom: 4,
   },
   trendingDeveloper: {
-    color: "rgba(255,255,255,0.8)",
+    color: "#ccc",
     fontSize: 12,
     marginBottom: 8,
   },
   installButtonSmall: {
-    backgroundColor: "white",
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    backgroundColor: "#FF6B6B",
     borderRadius: 15,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
   installButtonTextSmall: {
-    color: "#333",
+    color: "#fff",
+    fontWeight: "500",
     fontSize: 12,
-    fontWeight: "600",
-  },
-  newReleasesList: {
-    paddingRight: 20,
   },
   gameCard: {
-    width: 140,
-    height: 180,
+    width: 120,
+    borderRadius: 10,
     marginRight: 15,
-    borderRadius: 15,
     overflow: "hidden",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    elevation: 2,
   },
   gameImage: {
     width: "100%",
-    height: "100%",
-    borderRadius: 15,
+    height: 80,
+    resizeMode: "cover",
   },
   gameOverlay: {
     position: "absolute",
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
-    backgroundColor: "rgba(0,0,0,0.7)",
+    bottom: 0,
+    justifyContent: "flex-end",
     padding: 10,
-    borderBottomLeftRadius: 15,
-    borderBottomRightRadius: 15,
-  },
-  gameInfo: {
-    flex: 1,
   },
   gameTitle: {
     color: "#fff",
+    fontWeight: "600",
     fontSize: 14,
-    fontWeight: "bold",
-    marginBottom: 2,
+    marginBottom: 4,
   },
   gameDeveloper: {
     color: "#ccc",
     fontSize: 12,
     marginBottom: 8,
+  },
+  gameInfo: {
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 10,
+    padding: 10,
   },
   priceContainer: {
     flexDirection: "row",
@@ -1082,17 +1031,213 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   originalPrice: {
-    color: "#ccc",
-    fontSize: 12,
+    color: "#fff",
     textDecorationLine: "line-through",
-    marginRight: 5,
+    fontSize: 12,
+    marginRight: 4,
   },
   salePrice: {
-    color: "#4CAF50",
-    fontSize: 12,
-    fontWeight: "bold",
+    color: "#FF6B6B",
+    fontWeight: "600",
+    fontSize: 14,
   },
-  paidButton: {
-    backgroundColor: "#FF9800",
+  installButton: {
+    backgroundColor: "#FF6B6B",
+    borderRadius: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+  },
+  installButtonText: {
+    color: "#fff",
+    fontWeight: "500",
+    fontSize: 14,
+  },
+  searchResultItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+  },
+  searchResultIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  searchResultInfo: {
+    flex: 1,
+  },
+  searchResultName: {
+    fontWeight: "500",
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  searchResultDeveloper: {
+    color: "#666",
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  searchResultCategory: {
+    fontSize: 12,
+    borderRadius: 10,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+  },
+  searchResultActions: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  miniInstallButton: {
+    backgroundColor: "#FF6B6B",
+    borderRadius: 15,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  miniInstallButtonText: {
+    color: "#fff",
+    fontWeight: "500",
+    fontSize: 12,
+  },
+  searchResults: {
+    position: "absolute",
+    top: 60,
+    left: 0,
+    right: 0,
+    zIndex: 999,
+    borderRadius: 10,
+    overflow: "hidden",
+    elevation: 4,
+  },
+  seeAllResults: {
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderTopWidth: 1,
+    borderTopColor: "#ddd",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  seeAllText: {
+    fontWeight: "500",
+    fontSize: 14,
+  },
+  noResultsDropdown: {
+    position: "absolute",
+    top: 60,
+    left: 0,
+    right: 0,
+    zIndex: 999,
+    borderRadius: 10,
+    overflow: "hidden",
+    elevation: 4,
+    padding: 15,
+  },
+  noResultsText: {
+    color: "#666",
+    fontSize: 14,
+    marginBottom: 10,
+  },
+  searchAllButton: {
+    backgroundColor: "#FF6B6B",
+    borderRadius: 15,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignSelf: "flex-start",
+  },
+  searchAllButtonText: {
+    color: "#fff",
+    fontWeight: "500",
+    fontSize: 14,
+  },
+  appsList: {
+    paddingBottom: 20,
+  },
+  cardContainer: {
+    width: 140,
+    marginRight: 16,
+    marginVertical: 8,
+    borderRadius: 12,
+    overflow: "hidden",
+    elevation: 4,
+  },
+  cardImage: {
+    width: "100%",
+    height: 80,
+  },
+  cardContent: {
+    padding: 8,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  cardSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  subInfoText: {
+    fontSize: 12,
+    marginTop: 0,
+  },
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  badge: {
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "500",
+  },
+  // Category label badge
+  categoryLabel: {
+    alignSelf: "flex-start",
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 4,
+  },
+  categoryLabelText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "500",
+  },
+  // Rating under category
+  ratingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  newReleasesList: {
+    paddingLeft: 20,
+    paddingBottom: 10,
+  },
+  loader: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  categoryLabel: {
+    backgroundColor: "#FF6B6B",
+    borderRadius: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginTop: 4,
+  },
+  categoryLabelText: {
+    color: "#fff",
+    fontWeight: "500",
+    fontSize: 12,
+  },
+  ratingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
   },
 });

@@ -197,18 +197,14 @@ export default function SearchScreen({ navigation }) {
 
       {/* Contenido */}
       {searchText.trim() === "" ? (
-        // Mostrar búsquedas recientes cuando no hay texto
-        <View style={styles.recentContainer}>
-          <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-            {getText("recentSearches") || "Búsquedas recientes"}
-          </Text>
-          <FlatList
-            data={recentSearches}
-            renderItem={renderRecentSearch}
-            keyExtractor={(item, index) => index.toString()}
-            showsVerticalScrollIndicator={false}
-          />
-        </View>
+        // Mostrar todos los juegos existentes cuando no hay texto de búsqueda
+        <FlatList
+          data={appsData}
+          renderItem={renderAppItem}
+          keyExtractor={(item) => item.id.toString()}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.resultsList}
+        />
       ) : filteredApps.length > 0 ? (
         // Mostrar resultados de búsqueda
         <View style={styles.resultsContainer}>

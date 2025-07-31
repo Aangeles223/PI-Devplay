@@ -1,24 +1,47 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   Image,
-  TouchableOpacity,
   ScrollView,
+  TouchableOpacity,
   FlatList,
   Dimensions,
   Modal,
 } from "react-native";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { appsData } from "../data/appsData";
 
 const { width } = Dimensions.get("window");
 
-export default function AppDetailsScreen({ route, navigation }) {
+export default function AppDetailsScreen({ navigation, route }) {
   const { theme, getText, language, getGameText } = useTheme();
-  const { app } = route.params;
+  const { app } = route.params || {};
+
+  // Reset screenshot modal when switching apps
+  useEffect(() => {
+    setSelectedScreenshot(null);
+    setShowImageModal(false);
+  }, [app.id]);
+
+  if (!app) return <Text>Error: App no encontrada</Text>;
+
+  // Format price: parse numeric price or display raw string
+  let priceText;
+  if (app.price != null) {
+    const num = parseFloat(app.price);
+    if (!isNaN(num)) {
+      priceText = `$${num.toFixed(2)}`;
+    } else {
+      priceText = app.price; // raw price string (e.g., 'gratis')
+    }
+  } else if (app.isFree) {
+    priceText = getText("free");
+  } else {
+    priceText = getText("unknown");
+  }
+
   const [selectedScreenshot, setSelectedScreenshot] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
 
@@ -91,42 +114,42 @@ export default function AppDetailsScreen({ route, navigation }) {
       id: "rdr2",
       name: "Red Dead Redemption 2",
       price: language === "es" ? "$40.00" : "$40.00",
-      image: require("../../assets/games/red-dead-redemption-2/icon.jpg"),
+      image: require("../../assets/games/red-dead-redemption-2/Redemption_icon.jpg"),
       rating: 4.8,
     },
     {
       id: "gow",
       name: "God Of War",
       price: getText("free"),
-      image: require("../../assets/games/god-of-war/icon.jpg"),
+      image: require("../../assets/games/god-of-war/god_icon.jpg"),
       rating: 4.9,
     },
     {
       id: "forza",
       name: "Forza Horizon 5",
       price: getText("free"),
-      image: require("../../assets/games/forza-horizon-5/icon.webp"),
+      image: require("../../assets/games/forza-horizon-5/Forza_icon.jpg"),
       rating: 4.7,
     },
     {
       id: "minecraft",
       name: "Minecraft",
-      price: language === "es" ? "$29.99" : "$29.99",
-      image: require("../../assets/games/minecraft/icon.jpg"),
+      price: language === "es" ? "$567.99" : "$567.99",
+      image: require("../../assets/games/minecraft/minecraft_icon.jpg"),
       rating: 4.5,
     },
     {
       id: "cod",
       name: "Call of Duty Mobile",
       price: getText("free"),
-      image: require("../../assets/games/call-of-duty/icon.jpg"),
+      image: require("../../assets/games/call-of-duty/cod_icon.jpg"),
       rating: 4.3,
     },
     {
       id: "pubg",
       name: "PUBG Mobile",
       price: getText("free"),
-      image: require("../../assets/games/pubg-mobile/icon.jpg"),
+      image: require("../../assets/games/pubg-mobile/pug_icon.jpg"),
       rating: 4.2,
     },
   ];
@@ -199,7 +222,7 @@ export default function AppDetailsScreen({ route, navigation }) {
         setShowImageModal(true);
       }}
     >
-      <Image source={item} style={styles.screenshotImage} />
+      <Image source={{ uri: item }} style={styles.screenshotImage} />
     </TouchableOpacity>
   );
 
@@ -209,7 +232,7 @@ export default function AppDetailsScreen({ route, navigation }) {
     >
       {/* Header Image */}
       <View style={styles.headerImageContainer}>
-        <Image source={app.icon} style={styles.headerImage} />
+        <Image source={{ uri: app.icon }} style={styles.headerImage} />
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -309,7 +332,7 @@ export default function AppDetailsScreen({ route, navigation }) {
                 {getText("developer")}
               </Text>
               <Text style={[styles.techInfoValue, { color: theme.textColor }]}>
-                {app.developer}
+                {app.developer || getText("unknown")}
               </Text>
             </View>
             <View style={styles.techInfoRow}>
@@ -510,7 +533,7 @@ export default function AppDetailsScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = {
   container: {
     flex: 1,
   },
@@ -541,34 +564,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   appInfoCard: {
-    padding: 20,
-    borderRadius: 15,
+    borderRadius: 12,
+    padding: 16,
     marginTop: 20,
-    marginBottom: 10,
+    marginBottom: 20,
   },
   appInfoHeader: {
     flexDirection: "row",
-    justifyContent: "space-around",
     alignItems: "center",
+    justifyContent: "space-around",
+  },
+  downloadIcon: {
+    padding: 8,
   },
   appBasicInfo: {
     alignItems: "center",
   },
   appInfoTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: "600",
   },
   appInfoSubtitle: {
     fontSize: 12,
+    marginTop: 2,
   },
   section: {
-    marginVertical: 15,
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 15,
+    fontWeight: "700",
+    marginBottom: 12,
   },
   // Screenshots styles
   screenshotsList: {
@@ -582,8 +608,8 @@ const styles = StyleSheet.create({
   },
   // Description styles
   descriptionText: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 20,
   },
   // Technical Info styles
   techInfoCard: {
@@ -800,74 +826,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  appInfoCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  appInfoHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-  },
-  downloadIcon: {
-    padding: 8,
-  },
-  appBasicInfo: {
-    alignItems: "center",
-  },
-  appInfoTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  appInfoSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 12,
-  },
-  descriptionText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  similarGamesList: {
-    paddingTop: 8,
-  },
-  similarGameCard: {
-    width: 120,
-    marginRight: 16,
-  },
-  similarGameImage: {
-    width: 120,
-    height: 160,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  similarGameName: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  similarGamePrice: {
-    fontSize: 12,
-  },
-  installButton: {
-    backgroundColor: "#8B5A96",
-    borderRadius: 25,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginVertical: 20,
-  },
-  installButtonText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-});
+};

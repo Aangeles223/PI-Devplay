@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,18 +9,35 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
-import { appsData } from "../data/appsData";
+import { appsData as staticApps } from "../data/appsData"; // for fallback if needed
 
 export default function CategoriesScreen({ route, navigation }) {
   const { theme, getText } = useTheme();
-  const { categoryName, categoryFilter, gamesData } = route.params;
+  const { categoryName, categoryId, gamesData } = route.params;
+  const [appsData, setAppsData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Si hay gamesData específica (de "Ver más"), usar esa; si no, filtrar por categoría
-  const filteredGames =
-    gamesData ||
-    (categoryFilter
-      ? appsData.filter((app) => app.category === categoryFilter)
-      : appsData);
+  useEffect(() => {
+    fetch("http://10.0.0.11:3001/apps")
+      .then((res) => res.json())
+      .then((data) => {
+        setAppsData(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error al cargar apps:", err);
+        setAppsData(staticApps);
+        setLoading(false);
+      });
+  }, []);
+
+  // Determine games to display: specific list or by categoryId
+  const filteredGames = loading
+    ? []
+    : gamesData ||
+      (categoryId
+        ? appsData.filter((app) => app.categoryId === categoryId)
+        : appsData);
 
   const handleAppPress = (app) => {
     navigation.navigate("AppDetails", { app });
@@ -31,27 +48,29 @@ export default function CategoriesScreen({ route, navigation }) {
       style={[styles.gameCard, { backgroundColor: theme.cardBackground }]}
       onPress={() => handleAppPress(item)}
     >
-      <Image source={item.icon} style={styles.gameImage} />
+      <Image
+        source={
+          item.icon ? { uri: item.icon } : require("../../assets/icon.png")
+        }
+        style={styles.gameImage}
+      />
       <View style={styles.gameInfo}>
         <Text style={[styles.gameName, { color: theme.textColor }]}>
           {item.name}
         </Text>
         <Text style={[styles.gameDeveloper, { color: theme.textSecondary }]}>
-          {item.developer}
+          {item.price}
         </Text>
         <View style={styles.gameMetrics}>
           <View style={styles.rating}>
             <Ionicons name="star" size={14} color="#FFD700" />
             <Text style={[styles.ratingText, { color: theme.textSecondary }]}>
-              {item.rating}
+              {item.rating?.toFixed(1) || ""}
             </Text>
           </View>
-          {item.isOnSale && (
-            <View style={styles.priceContainer}>
-              <Text style={styles.originalPrice}>{item.originalPrice}</Text>
-              <Text style={styles.salePrice}>{item.salePrice}</Text>
-            </View>
-          )}
+          <Text style={[styles.priceContainer, { color: theme.textSecondary }]}>
+            {item.price}
+          </Text>
         </View>
         <TouchableOpacity
           style={[
@@ -60,16 +79,25 @@ export default function CategoriesScreen({ route, navigation }) {
           ]}
         >
           <Text style={styles.installButtonText}>
-            {item.isFree
-              ? getText("install")
-              : item.isOnSale
-              ? item.salePrice
-              : item.originalPrice || getText("install")}
+            {item.isFree ? getText("install") : item.price}
           </Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
+
+  if (loading) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
+        <Text>{getText("loading") || "Cargando..."}</Text>
+      </View>
+    );
+  }
 
   return (
     <View

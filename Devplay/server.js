@@ -187,13 +187,83 @@ app.post("/login", (req, res) => {
 
 // RUTA GET /apps
 app.get("/apps", (req, res) => {
-  // Cambia 'apps' por el nombre real de tu tabla
-  db.query("SELECT * FROM app", (err, results) => {
-    if (err) {
-      console.error("Error al leer app:", err);
-      return res.status(500).json({ error: err.message });
-    }
-    res.json(results);
+  const sql = `
+    SELECT
+      a.id_app       AS id,
+      a.nombre       AS name,
+      a.precio       AS price,
+      NULL           AS rating,
+      a.rango_edad   AS ageRating,
+      a.peso         AS size,
+      a.descripcion  AS description,
+      ac.categorias_id AS categoryId,
+      c.nombre     AS category,
+      a.img1,
+      a.img2,
+      a.img3l      AS img3,   -- aquí estaba el typo
+      a.icono,
+      a.is_free      AS isFree,
+      a.is_premium   AS isPremium,
+      a.is_on_sale   AS isOnSale,
+      a.is_multiplayer AS isMultiplayer,
+      a.is_offline   AS isOffline
+    FROM app a
+    LEFT JOIN app_categorias ac ON a.id_app = ac.app_id_app
+    LEFT JOIN categorias c ON ac.categorias_id = c.id
+    ORDER BY a.id_app
+  `;
+  db.query(sql, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const apps = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      price: r.price,
+      description: r.description,
+      rating: r.rating,
+      ageRating: r.ageRating,
+      size: r.size,
+      categoryId: r.categoryId,
+      category: r.category,
+      icon: r.icono
+        ? `data:image/jpeg;base64,${r.icono.toString("base64")}`
+        : null,
+      screenshots: [
+        r.img1 ? `data:image/jpeg;base64,${r.img1.toString("base64")}` : null,
+        r.img2 ? `data:image/jpeg;base64,${r.img2.toString("base64")}` : null,
+        r.img3 ? `data:image/jpeg;base64,${r.img3.toString("base64")}` : null,
+      ],
+      // Flags for frontend filtering: free if text contains 'gratis' or price numeric equals 0
+      isFree: (() => {
+        const priceText =
+          r.price != null ? r.price.toString().trim().toLowerCase() : "";
+        return priceText.includes("gratis") || parseFloat(priceText) === 0;
+      })(),
+      isPremium: (() => {
+        const priceText =
+          r.price != null ? r.price.toString().trim().toLowerCase() : "";
+        // Anything not free is premium
+        return !(priceText.includes("gratis") || parseFloat(priceText) === 0);
+      })(),
+      isOnSale: r.isOnSale,
+      isMultiplayer: r.isMultiplayer,
+      isOffline: r.isOffline,
+    }));
+    res.json(apps);
+  });
+});
+
+// RUTA GET /categorias
+app.get("/categorias", (req, res) => {
+  const sql = `
+    SELECT
+      id            AS id,
+      nombre        AS name
+    FROM categorias
+    ORDER BY nombre
+  `;
+  db.query(sql, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
   });
 });
 
