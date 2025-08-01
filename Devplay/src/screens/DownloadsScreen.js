@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,92 +7,52 @@ import {
   ScrollView,
   FlatList,
   Image,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
+import Constants from "expo-constants";
 
 export default function DownloadsScreen({ navigation }) {
   const { theme, getText } = useTheme();
   const [activeTab, setActiveTab] = useState("downloaded");
 
-  // Mock data for downloaded apps
-  const downloadedApps = [
-    {
-      id: "1",
-      name: "WhatsApp",
-      category: "Comunicación",
-      size: "89.2 MB",
-      downloadDate: "15 Ene 2024",
-      version: "2.24.1.78",
-      icon: "logo-whatsapp",
-      status: "completed",
-    },
-    {
-      id: "2",
-      name: "Instagram",
-      category: "Redes sociales",
-      size: "156.8 MB",
-      downloadDate: "12 Ene 2024",
-      version: "312.0.0.37.120",
-      icon: "logo-instagram",
-      status: "completed",
-    },
-    {
-      id: "3",
-      name: "Spotify",
-      category: "Música",
-      size: "95.4 MB",
-      downloadDate: "10 Ene 2024",
-      version: "8.8.96.488",
-      icon: "musical-notes",
-      status: "completed",
-    },
-  ];
+  // Host for API: emulator vs device
+  // Host for API: emulator vs device
+  // Host for API: derive dev server IP dynamically
+  // Host for API: Android emulator or development machine on LAN
+  const host =
+    Platform.OS === "android"
+      ? "http://10.0.2.2:3001"
+      : "http://10.0.0.11:3001"; // Reemplaza 10.0.0.11 con la IP de tu PC en la LAN
+  // Fetch all apps for mapping downloads
+  const [backendApps, setBackendApps] = useState([]);
+  useEffect(() => {
+    console.log("DownloadsScreen using API host:", host);
+    fetch(`${host}/apps`)
+      .then((res) => res.json())
+      .then((data) => setBackendApps(data))
+      .catch(console.error);
+  }, [host]);
 
-  // Mock data for pending downloads
-  const pendingApps = [
-    {
-      id: "4",
-      name: "Netflix",
-      category: "Entretenimiento",
-      size: "215.6 MB",
-      icon: "play-circle",
-      status: "pending",
-    },
-    {
-      id: "5",
-      name: "Uber",
-      category: "Viajes",
-      size: "78.9 MB",
-      icon: "car",
-      status: "pending",
-    },
-  ];
+  // Real data for downloaded apps
+  const [downloadedApps, setDownloadedApps] = useState([]);
+  // Downloading apps state (simulate progress)
+  const [downloadingApps, setDownloadingApps] = useState([]);
+  // Timers for download simulation
+  const downloadTimers = useRef({});
+  // Timeout timers for download completion
+  const timeoutTimers = useRef({});
 
-  // Mock data for downloading apps
-  const downloadingApps = [
-    {
-      id: "6",
-      name: "TikTok",
-      category: "Redes sociales",
-      size: "198.3 MB",
-      downloaded: "145.2 MB",
-      progress: 73,
-      icon: "musical-note",
-      status: "downloading",
-    },
-    {
-      id: "7",
-      name: "YouTube",
-      category: "Entretenimiento",
-      size: "132.7 MB",
-      downloaded: "45.8 MB",
-      progress: 34,
-      icon: "logo-youtube",
-      status: "downloading",
-    },
-  ];
-
+  // Pending apps: those in backendApps not yet downloaded or downloading
+  const pendingApps = backendApps
+    .filter(
+      (a) =>
+        !downloadedApps?.some((d) => d.appId === a.id) &&
+        !downloadingApps?.some((d) => d.id === a.id)
+    )
+    .map((a) => ({ ...a, status: "pending" }));
+  // Tabs based on downloadedApps
   const tabs = [
     {
       id: "downloaded",
@@ -108,22 +68,103 @@ export default function DownloadsScreen({ navigation }) {
   ];
 
   const getCurrentData = () => {
-    switch (activeTab) {
-      case "downloaded":
-        return downloadedApps;
-      case "downloading":
-        return downloadingApps;
-      case "pending":
-        return pendingApps;
-      default:
-        return [];
-    }
+    if (activeTab === "downloaded")
+      return downloadedApps.filter((d) => d.status === "completed");
+    if (activeTab === "downloading") return downloadingApps;
+    if (activeTab === "pending") return pendingApps;
+    return [];
   };
+  // Load downloads from backend
+  const loadDownloads = () => {
+    fetch(`${host}/descargas`)
+      .then((res) => res.json())
+      .then((data) => {
+        const mapped = data.map((d) => {
+          const appInfo = backendApps.find((a) => a.id === d.id_app) || {};
+          return {
+            ...appInfo,
+            downloadId: d.id_descarga,
+            appId: d.id_app,
+            downloadDate: d.fecha,
+            status: "completed",
+          };
+        });
+        setDownloadedApps(mapped);
+      })
+      .catch(console.error);
+  };
+  useEffect(() => {
+    loadDownloads();
+  }, [host, backendApps]);
+
+  const handleStartDownload = (app) => {
+    // Notify download start
+    alert(`${getText("downloading") || "Descargando"}: ${app.name}`);
+    // add to downloading list and switch to downloading tab
+    setDownloadingApps((prev) => [
+      ...prev,
+      { ...app, progress: 0, status: "downloading" },
+    ]);
+    setActiveTab("downloading");
+    // tick every second
+    const interval = setInterval(() => {
+      setDownloadingApps((prev) =>
+        prev.map((d) =>
+          d.id === app.id
+            ? { ...d, progress: Math.min(d.progress + 100 / 240, 100) }
+            : d
+        )
+      );
+    }, 1000);
+    downloadTimers.current[app.id] = interval;
+    // finish after 4 minutes
+    const timeoutId = setTimeout(() => {
+      clearInterval(downloadTimers.current[app.id]);
+      setDownloadingApps((prev) => prev.filter((d) => d.id !== app.id));
+      // Notify download completion
+      alert(`${app.name} ${getText("downloadComplete") || "instalado"}`);
+      // record download in backend
+      fetch(`${host}/descargas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_app: app.id }),
+      })
+        .then((res) => res.json())
+        .then(() => loadDownloads())
+        .catch(console.error);
+    }, 240000);
+    timeoutTimers.current[app.id] = timeoutId;
+    timeoutTimers.current[app.id] = timeoutId;
+  };
+  // Uninstall downloaded app
+  const handleUninstall = (downloadId) => {
+    fetch(`${host}/descargas/${downloadId}`, { method: "DELETE" })
+      .then((res) => res.json())
+      .then(() => loadDownloads())
+      .catch(console.error);
+  };
+
+  // Upon unmount, clear all timers to avoid state updates
+  useEffect(() => {
+    return () => {
+      // Clear all download intervals
+      Object.values(downloadTimers.current).forEach((id) => clearInterval(id));
+      // Clear all completion timeouts
+      Object.values(timeoutTimers.current).forEach((id) => clearTimeout(id));
+    };
+  }, []);
 
   const renderDownloadedApp = ({ item }) => (
     <View style={[styles.appItem, { backgroundColor: theme.cardBackground }]}>
       <View style={styles.appIcon}>
-        <Ionicons name={item.icon} size={40} color="#8E44AD" />
+        {item.icon ? (
+          <Image
+            source={{ uri: item.icon }}
+            style={{ width: 40, height: 40, borderRadius: 8 }}
+          />
+        ) : (
+          <Ionicons name="alert-circle" size={40} color="#ccc" />
+        )}
       </View>
       <View style={styles.appInfo}>
         <Text style={[styles.appName, { color: theme.textColor }]}>
@@ -133,18 +174,19 @@ export default function DownloadsScreen({ navigation }) {
           {item.category}
         </Text>
         <Text style={[styles.appDetails, { color: theme.secondaryTextColor }]}>
-          {item.size} • {item.downloadDate}
+          {item.size} • {new Date(item.downloadDate).toLocaleDateString()}
         </Text>
         <Text style={[styles.appVersion, { color: theme.secondaryTextColor }]}>
           Versión {item.version}
         </Text>
       </View>
-      <TouchableOpacity style={styles.actionButton}>
-        <Ionicons
-          name="ellipsis-vertical"
-          size={20}
-          color={theme.secondaryTextColor}
-        />
+      <TouchableOpacity
+        style={styles.downloadButton}
+        onPress={() => handleUninstall(item.downloadId)}
+      >
+        <Text style={{ color: "#FF3B30", fontWeight: "600" }}>
+          {getText("uninstall") || "Desinstalar"}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -152,7 +194,14 @@ export default function DownloadsScreen({ navigation }) {
   const renderDownloadingApp = ({ item }) => (
     <View style={[styles.appItem, { backgroundColor: theme.cardBackground }]}>
       <View style={styles.appIcon}>
-        <Ionicons name={item.icon} size={40} color="#8E44AD" />
+        {item.icon ? (
+          <Image
+            source={{ uri: item.icon }}
+            style={{ width: 40, height: 40, borderRadius: 8 }}
+          />
+        ) : (
+          <Ionicons name="alert-circle" size={40} color="#ccc" />
+        )}
       </View>
       <View style={styles.appInfo}>
         <Text style={[styles.appName, { color: theme.textColor }]}>
@@ -162,20 +211,16 @@ export default function DownloadsScreen({ navigation }) {
           {item.category}
         </Text>
         <Text style={[styles.appDetails, { color: theme.secondaryTextColor }]}>
-          {item.downloaded} de {item.size}
+          {`${Math.round(item.progress)}% de ${item.size}`}
         </Text>
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View
-              style={[styles.progressFill, { width: `${item.progress}%` }]}
-            />
-          </View>
-          <Text
-            style={[styles.progressText, { color: theme.secondaryTextColor }]}
-          >
-            {item.progress}%
-          </Text>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${item.progress}%` }]} />
         </View>
+        <Text
+          style={[styles.progressText, { color: theme.secondaryTextColor }]}
+        >
+          {`${Math.round(item.progress)}%`}
+        </Text>
       </View>
       <TouchableOpacity style={styles.pauseButton}>
         <Ionicons name="pause" size={20} color={theme.secondaryTextColor} />
@@ -186,7 +231,14 @@ export default function DownloadsScreen({ navigation }) {
   const renderPendingApp = ({ item }) => (
     <View style={[styles.appItem, { backgroundColor: theme.cardBackground }]}>
       <View style={styles.appIcon}>
-        <Ionicons name={item.icon} size={40} color="#8E44AD" />
+        {item.icon ? (
+          <Image
+            source={{ uri: item.icon }}
+            style={{ width: 40, height: 40, borderRadius: 8 }}
+          />
+        ) : (
+          <Ionicons name="alert-circle" size={40} color="#ccc" />
+        )}
       </View>
       <View style={styles.appInfo}>
         <Text style={[styles.appName, { color: theme.textColor }]}>
@@ -199,7 +251,10 @@ export default function DownloadsScreen({ navigation }) {
           {item.size} • Esperando descarga
         </Text>
       </View>
-      <TouchableOpacity style={styles.downloadButton}>
+      <TouchableOpacity
+        style={styles.downloadButton}
+        onPress={() => handleStartDownload(item)}
+      >
         <Ionicons name="download" size={20} color="#007AFF" />
       </TouchableOpacity>
     </View>
@@ -299,7 +354,10 @@ export default function DownloadsScreen({ navigation }) {
       <FlatList
         data={getCurrentData()}
         renderItem={renderApp}
-        keyExtractor={(item) => item.id}
+        // use downloadId for completed downloads or id otherwise to ensure unique keys
+        keyExtractor={(item) =>
+          (item.downloadId != null ? item.downloadId : item.id).toString()
+        }
         style={styles.appsList}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={() => (

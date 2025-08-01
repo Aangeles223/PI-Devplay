@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,22 +8,130 @@ import {
   FlatList,
   Dimensions,
   Modal,
+  Linking,
+  TextInput,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
+import Constants from "expo-constants";
+import { useContext } from "react";
+import { UserContext } from "../context/UserContext";
 import { appsData } from "../data/appsData";
 
 const { width } = Dimensions.get("window");
 
 export default function AppDetailsScreen({ navigation, route }) {
   const { theme, getText, language, getGameText } = useTheme();
+  const { usuario: user } = useContext(UserContext);
+  // Host for API: derive dev server IP dynamically
+  const localhost =
+    Constants.manifest?.debuggerHost?.split(":")[0] ?? "localhost";
+  const host =
+    Platform.OS === "android"
+      ? "http://10.0.2.2:3001"
+      : `http://${localhost}:3001`;
   const { app } = route.params || {};
+
+  // Compute header image source (backend icon or static image)
+  const headerSource =
+    typeof app.icon === "string"
+      ? { uri: app.icon }
+      : app.icon
+      ? app.icon
+      : app.image
+      ? typeof app.image === "string"
+        ? { uri: app.image }
+        : app.image
+      : null;
+  // Prepare screenshots list: backend screenshots or fallback to static image
+  const screenshotsList =
+    Array.isArray(app.screenshots) && app.screenshots.filter(Boolean).length > 0
+      ? app.screenshots.filter(Boolean)
+      : app.image
+      ? [app.image]
+      : [];
+
+  // Format release date (YYYY-MM-DD)
+  const releaseDateText = app.releaseDate
+    ? new Date(app.releaseDate).toLocaleDateString()
+    : "-";
+  const [selectedScreenshot, setSelectedScreenshot] = useState(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [newRating, setNewRating] = useState(0);
+  const [newComment, setNewComment] = useState("");
+  const [showAllReviews, setShowAllReviews] = useState(false);
+  // Sections for "Secciones"
+  const [sections, setSections] = useState([]);
+  const [sectionApps, setSectionApps] = useState({});
+  const [backendApps, setBackendApps] = useState([]);
+  // Track if this app is already downloaded
+  const [isDownloaded, setIsDownloaded] = useState(false);
+  // Simulate download state
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const downloadTimerRef = useRef(null);
 
   // Reset screenshot modal when switching apps
   useEffect(() => {
     setSelectedScreenshot(null);
     setShowImageModal(false);
   }, [app.id]);
+  // Fetch all apps from backend for section rendering
+  useEffect(() => {
+    fetch(`${host}/apps`)
+      .then((res) => res.json())
+      .then((data) => setBackendApps(data))
+      .catch(console.error);
+  }, [host]);
+
+  // Fetch reviews from backend
+  useEffect(() => {
+    fetch(`${host}/apps/${app.id}/reviews`)
+      .then((res) => res.json())
+      .then((data) => setReviews(data))
+      .catch(console.error);
+  }, [app.id]);
+
+  // Fetch sections and their apps
+  useEffect(() => {
+    fetch(`${host}/secciones`)
+      .then((res) => res.json())
+      .then((sects) => {
+        setSections(sects);
+        // Fetch apps for all sections and store raw DB entries
+        Promise.all(
+          sects.map((sec) =>
+            fetch(`${host}/secciones/${sec.id}/apps`).then((r) => r.json())
+          )
+        )
+          .then((allAppsLists) => {
+            const mapped = {};
+            sects.forEach((sec, idx) => {
+              mapped[sec.id] = Array.isArray(allAppsLists[idx])
+                ? allAppsLists[idx]
+                : [];
+            });
+            setSectionApps(mapped);
+          })
+          .catch(console.error);
+      })
+      .catch(console.error);
+  }, [host]);
+
+  // On mount, check download status
+  useEffect(() => {
+    fetch(`${host}/descargas`)
+      .then((res) => res.json())
+      .then((data) => {
+        const found = Array.isArray(data)
+          ? data.some((d) => d.id_app === app.id)
+          : false;
+        setIsDownloaded(found);
+      })
+      .catch(console.error);
+  }, [host, app.id]);
 
   if (!app) return <Text>Error: App no encontrada</Text>;
 
@@ -42,72 +150,83 @@ export default function AppDetailsScreen({ navigation, route }) {
     priceText = getText("unknown");
   }
 
-  const [selectedScreenshot, setSelectedScreenshot] = useState(null);
-  const [showImageModal, setShowImageModal] = useState(false);
-
-  // Función para navegar a juegos similares
-  const handleSimilarGamePress = (gameId) => {
-    // Crear un mapeo de IDs a nombres de juegos en appsData
-    const gameMapping = {
-      rdr2: "Red Dead Redemption 2",
-      gow: "God Of War",
-      forza: "Forza Horizon 5",
-      minecraft: "Minecraft",
-      cod: "Call of Duty Mobile",
-      fifa: "FIFA Mobile",
-      amongus: "Among Us",
-      pubg: "PUBG Mobile",
-      subway: "Subway Surfers",
-      genshin: "Genshin Impact",
-      monument: "Monument Valley",
-      clash: "Clash Royale",
-      alto: "Alto's Odyssey",
-      dead: "Dead Cells",
-      nfs: "Need for Speed",
-      sustainity: "Sustainity",
-    };
-
-    const gameName = gameMapping[gameId];
-    if (gameName) {
-      // Buscar el juego en appsData por nombre
-      const gameData = appsData.find((game) => game.name === gameName);
-      if (gameData) {
-        navigation.push("AppDetails", { app: gameData });
-      } else {
-        console.log(`Juego no encontrado en appsData: ${gameName}`);
-      }
-    } else {
-      console.log(`ID de juego no encontrado en el mapeo: ${gameId}`);
+  // Submit new review
+  const handleSubmitReview = () => {
+    if (!user) {
+      alert(
+        getText("loginToReview") || "Debes iniciar sesión para dejar una reseña"
+      );
+      return;
     }
+    fetch(`${host}/apps/${app.id}/reviews`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        usuario_id: user.id,
+        puntuacion: newRating,
+        comentario: newComment,
+      }),
+    })
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success) {
+          // Refresh reviews
+          fetch(`${host}/apps/${app.id}/reviews`)
+            .then((r) => r.json())
+            .then((data) => setReviews(data))
+            .catch(console.error);
+          setNewRating(0);
+          setNewComment("");
+        }
+      })
+      .catch(console.error);
   };
 
-  // Datos de reseñas simuladas
-  const reviews = [
-    {
-      id: 1,
-      user: "Angel_212121",
-      rating: 5,
-      date: "Hace 5 días",
-      comment:
-        "Está perfectamente optimizado, falta agregar la opción para poder jugar con controles de ps4 y Xbox one. Hay que aprovechar que se puede usar la compatibilidad con mandos, hay muchas personas que tienes problemas para jugar estos tipos de juegos porque les suda la pantalla.",
-    },
-    {
-      id: 2,
-      user: "GamerPro2024",
-      rating: 4,
-      date: "Hace 1 semana",
-      comment:
-        "Excelente juego, muy buena calidad gráfica y jugabilidad fluida. Solo le falta mejorar algunos aspectos del matchmaking.",
-    },
-    {
-      id: 3,
-      user: "MobileGamer",
-      rating: 5,
-      date: "Hace 2 semanas",
-      comment:
-        "El mejor juego de disparos para móvil que he jugado. Los controles son intuitivos y los gráficos son impresionantes.",
-    },
-  ];
+  // Open app simulation
+  const handleOpen = () => {
+    alert(getText("open") || "Abrir app");
+  };
+
+  // Simulate download: register download in backend after progress
+  const handleDownload = () => {
+    if (isDownloading) return;
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    // progress every second (4 minutes total -> 240s)
+    downloadTimerRef.current = setInterval(() => {
+      setDownloadProgress((prev) => {
+        const next = prev + 100 / 240;
+        if (next >= 100) {
+          clearInterval(downloadTimerRef.current);
+          setDownloadProgress(100);
+          setIsDownloading(false);
+          // record download in backend
+          fetch(`${host}/descargas`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id_app: app.id }),
+          })
+            .then((res) => res.json())
+            .then((resJson) => {
+              if (resJson.success) {
+                setIsDownloaded(true);
+                alert(getText("downloadComplete") || "Descarga completada");
+              }
+            })
+            .catch(console.error);
+        }
+        return next;
+      });
+    }, 1000);
+  };
+
+  // Calcular rating a mostrar: usar rating de la API o promedio de reseñas simuladas
+  const displayRating =
+    app.rating != null
+      ? app.rating
+      : reviews.length
+      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+      : 0;
 
   const similarGames = [
     {
@@ -153,6 +272,13 @@ export default function AppDetailsScreen({ navigation, route }) {
       rating: 4.2,
     },
   ];
+  // Navigate to details of a similar game by name
+  const handleSimilarGamePress = (game) => {
+    const selected = appsData.find((a) => a.name === game.name);
+    if (selected) {
+      navigation.push("AppDetails", { app: selected });
+    }
+  };
 
   const renderSimilarGame = ({ item }) => (
     <TouchableOpacity
@@ -160,7 +286,7 @@ export default function AppDetailsScreen({ navigation, route }) {
         styles.similarGameCard,
         { backgroundColor: theme.cardBackground },
       ]}
-      onPress={() => handleSimilarGamePress(item.id)}
+      onPress={() => handleSimilarGamePress(item)}
     >
       <Image source={item.image} style={styles.similarGameImage} />
       <Text style={[styles.similarGameName, { color: theme.textColor }]}>
@@ -180,14 +306,43 @@ export default function AppDetailsScreen({ navigation, route }) {
     </TouchableOpacity>
   );
 
+  // Render apps for each section
+  const renderSectionApp = ({ item }) => (
+    <TouchableOpacity
+      style={[
+        styles.similarGameCard,
+        { backgroundColor: theme.cardBackground },
+      ]}
+      onPress={() => navigation.push("AppDetails", { app: item })}
+    >
+      <Image
+        source={typeof item.icon === "string" ? { uri: item.icon } : item.icon}
+        style={styles.similarGameImage}
+      />
+      <Text
+        style={[styles.similarGameName, { color: theme.textColor }]}
+        numberOfLines={1}
+      >
+        {item.name}
+      </Text>
+    </TouchableOpacity>
+  );
+
   const renderReview = ({ item }) => (
     <View
       style={[styles.reviewCard, { backgroundColor: theme.cardBackground }]}
     >
       <View style={styles.reviewHeader}>
         <View style={styles.reviewUserInfo}>
-          <View style={[styles.userAvatar, { backgroundColor: theme.primary }]}>
-            <Text style={styles.userAvatarText}>{item.user.charAt(0)}</Text>
+          <View style={styles.userAvatar}>
+            {item.avatar ? (
+              <Image
+                source={{ uri: item.avatar }}
+                style={styles.userAvatarImage}
+              />
+            ) : (
+              <Text style={styles.userAvatarText}>{item.user.charAt(0)}</Text>
+            )}
           </View>
           <View>
             <Text style={[styles.reviewUser, { color: theme.textColor }]}>
@@ -222,9 +377,14 @@ export default function AppDetailsScreen({ navigation, route }) {
         setShowImageModal(true);
       }}
     >
-      <Image source={{ uri: item }} style={styles.screenshotImage} />
+      <Image
+        source={typeof item === "string" ? { uri: item } : item}
+        style={styles.screenshotImage}
+      />
     </TouchableOpacity>
   );
+
+  const displayedReviews = showAllReviews ? reviews : reviews.slice(0, 3);
 
   return (
     <View
@@ -232,7 +392,9 @@ export default function AppDetailsScreen({ navigation, route }) {
     >
       {/* Header Image */}
       <View style={styles.headerImageContainer}>
-        <Image source={{ uri: app.icon }} style={styles.headerImage} />
+        {headerSource && (
+          <Image source={headerSource} style={styles.headerImage} />
+        )}
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -256,7 +418,7 @@ export default function AppDetailsScreen({ navigation, route }) {
           <View style={styles.appInfoHeader}>
             <View style={styles.appBasicInfo}>
               <Text style={[styles.appInfoTitle, { color: theme.textColor }]}>
-                {app.rating}
+                {displayRating.toFixed(1)}
               </Text>
               <Text
                 style={[styles.appInfoSubtitle, { color: theme.textSecondary }]}
@@ -293,7 +455,7 @@ export default function AppDetailsScreen({ navigation, route }) {
             Screenshots
           </Text>
           <FlatList
-            data={app.screenshots}
+            data={screenshotsList}
             renderItem={renderScreenshot}
             keyExtractor={(item, index) => index.toString()}
             horizontal
@@ -362,16 +524,6 @@ export default function AppDetailsScreen({ navigation, route }) {
                 {getText("compatibility")}
               </Text>
               <Text style={[styles.techInfoValue, { color: theme.textColor }]}>
-                Con este iPhone
-              </Text>
-            </View>
-            <View style={styles.techInfoRow}>
-              <Text
-                style={[styles.techInfoLabel, { color: theme.textSecondary }]}
-              >
-                Idiomas
-              </Text>
-              <Text style={[styles.techInfoValue, { color: theme.textColor }]}>
                 Español y 9 más
               </Text>
             </View>
@@ -405,18 +557,102 @@ export default function AppDetailsScreen({ navigation, route }) {
                 © 2025 {app.developer}
               </Text>
             </View>
+            {/* Nueva fila: versión, fecha y enlace APK */}
+            <View style={styles.techInfoRow}>
+              <Text
+                style={[styles.techInfoLabel, { color: theme.textSecondary }]}
+              >
+                Versión
+              </Text>
+              <Text style={[styles.techInfoValue, { color: theme.textColor }]}>
+                {app.version || "-"}
+              </Text>
+            </View>
+            <View style={styles.techInfoRow}>
+              <Text
+                style={[styles.techInfoLabel, { color: theme.textSecondary }]}
+              >
+                Fecha de lanzamiento
+              </Text>
+              <Text style={[styles.techInfoValue, { color: theme.textColor }]}>
+                {releaseDateText}
+              </Text>
+            </View>
+            <View style={styles.techInfoRow}>
+              <Text
+                style={[styles.techInfoLabel, { color: theme.textSecondary }]}
+              >
+                APK
+              </Text>
+              {app.apkUrl ? (
+                <TouchableOpacity onPress={() => Linking.openURL(app.apkUrl)}>
+                  <Text
+                    style={[
+                      styles.techInfoValue,
+                      { color: theme.primary, textDecorationLine: "underline" },
+                    ]}
+                  >
+                    Descargar
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <Text
+                  style={[styles.techInfoValue, { color: theme.textColor }]}
+                >
+                  -
+                </Text>
+              )}
+            </View>
           </View>
         </View>
 
+        {/* Tu reseña */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+            Tu reseña
+          </Text>
+          <View style={styles.ratingStars}>
+            {[...Array(5)].map((_, i) => (
+              <TouchableOpacity key={i} onPress={() => setNewRating(i + 1)}>
+                <Ionicons
+                  name={i < newRating ? "star" : "star-outline"}
+                  size={30}
+                  color={theme.primary}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput
+            style={[
+              styles.commentInput,
+              { color: theme.textColor, borderColor: theme.textSecondary },
+            ]}
+            placeholder="Escribe tu comentario"
+            placeholderTextColor={theme.textSecondary}
+            value={newComment}
+            onChangeText={setNewComment}
+            multiline
+          />
+          <TouchableOpacity
+            style={styles.submitButton}
+            onPress={handleSubmitReview}
+          >
+            <Text style={styles.submitButtonText}>Enviar</Text>
+          </TouchableOpacity>
+        </View>
         {/* Reviews */}
         <View style={styles.section}>
           <View style={styles.reviewsHeader}>
             <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
               {getText("reviews")}
             </Text>
-            <TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowAllReviews(!showAllReviews)}
+            >
               <Text style={[styles.seeAllText, { color: theme.primary }]}>
-                Ver todo
+                {showAllReviews
+                  ? getText("showLess") || "Ver menos"
+                  : getText("seeAll") || "Ver todo"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -424,7 +660,7 @@ export default function AppDetailsScreen({ navigation, route }) {
           <View style={styles.ratingOverview}>
             <View style={styles.ratingScore}>
               <Text style={[styles.ratingNumber, { color: theme.textColor }]}>
-                {app.rating}
+                {displayRating.toFixed(1)}
               </Text>
               <Text
                 style={[styles.ratingSubtext, { color: theme.textSecondary }]}
@@ -464,19 +700,8 @@ export default function AppDetailsScreen({ navigation, route }) {
             </Text>
           </View>
 
-          <Text style={[styles.reviewPrompt, { color: theme.textSecondary }]}>
-            Toca para calificar:
-          </Text>
-          <View style={styles.ratingStars}>
-            {[...Array(5)].map((_, index) => (
-              <TouchableOpacity key={index}>
-                <Ionicons name="star-outline" size={30} color={theme.primary} />
-              </TouchableOpacity>
-            ))}
-          </View>
-
           <FlatList
-            data={reviews}
+            data={displayedReviews}
             renderItem={renderReview}
             keyExtractor={(item) => item.id.toString()}
             scrollEnabled={false}
@@ -494,13 +719,53 @@ export default function AppDetailsScreen({ navigation, route }) {
             keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
+            nestedScrollEnabled
+            scrollEnabled
             contentContainerStyle={styles.similarGamesList}
           />
         </View>
 
-        {/* Install Button */}
-        <TouchableOpacity style={styles.installButton}>
-          <Text style={styles.installButtonText}>Obtener</Text>
+        {/* Secciones */}
+        {sections.map((sec) => (
+          <View key={sec.id} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+              {sec.name}
+            </Text>
+            <FlatList
+              data={
+                Array.isArray(sectionApps[sec.id])
+                  ? sectionApps[sec.id]
+                      .map((sa) => {
+                        // use sa.id (alias from SQL) or sa.id_app if present
+                        const sectionAppId = sa.id ?? sa.id_app;
+                        return backendApps.find((a) => a.id === sectionAppId);
+                      })
+                      .filter(Boolean)
+                  : []
+              }
+              renderItem={renderSectionApp}
+              keyExtractor={(item) => item.id.toString()}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              nestedScrollEnabled
+              contentContainerStyle={styles.similarGamesList}
+            />
+          </View>
+        ))}
+
+        {/* Install / Open Button */}
+        <TouchableOpacity
+          style={styles.installButton}
+          onPress={isDownloaded ? handleOpen : handleDownload}
+          disabled={isDownloading}
+        >
+          <Text style={styles.installButtonText}>
+            {isDownloaded
+              ? getText("open") || "Abrir"
+              : isDownloading
+              ? `${Math.round(downloadProgress)}%`
+              : getText("download") || "Descargar"}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -518,7 +783,14 @@ export default function AppDetailsScreen({ navigation, route }) {
           />
           <View style={styles.modalImageContainer}>
             {selectedScreenshot && (
-              <Image source={selectedScreenshot} style={styles.modalImage} />
+              <Image
+                source={
+                  typeof selectedScreenshot === "string"
+                    ? { uri: selectedScreenshot }
+                    : selectedScreenshot
+                }
+                style={styles.modalImage}
+              />
             )}
             <TouchableOpacity
               style={styles.closeButton}
@@ -725,6 +997,11 @@ const styles = {
     fontWeight: "bold",
     fontSize: 16,
   },
+  userAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
   reviewUser: {
     fontSize: 16,
     fontWeight: "600",
@@ -825,5 +1102,24 @@ const styles = {
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  commentInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    height: 80,
+    marginBottom: 10,
+  },
+  submitButton: {
+    backgroundColor: "#007AFF",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  submitButtonText: {
+    color: "white",
+    fontWeight: "600",
   },
 };

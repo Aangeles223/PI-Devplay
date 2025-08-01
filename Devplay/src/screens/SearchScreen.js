@@ -6,6 +6,8 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  ScrollView,
+  Platform,
   StyleSheet,
   Alert,
 } from "react-native";
@@ -25,10 +27,16 @@ export default function SearchScreen({ navigation }) {
   ]);
   const [appsData, setAppsData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sections, setSections] = useState([]);
+  const [sectionApps, setSectionApps] = useState({});
+  const host =
+    Platform.OS === "android"
+      ? "http://10.0.2.2:3001"
+      : "http://10.0.0.11:3001";
 
   // Obtener apps desde el backend al montar
   useEffect(() => {
-    fetch("http://10.0.0.11:3001/apps")
+    fetch(`${host}/apps`)
       .then((res) => res.json())
       .then((data) => {
         setAppsData(data);
@@ -38,6 +46,23 @@ export default function SearchScreen({ navigation }) {
         setLoading(false);
         Alert.alert("Error", "No se pudo cargar la lista de apps");
       });
+  }, []);
+  // Obtener secciones y sus apps
+  useEffect(() => {
+    fetch(`${host}/secciones`)
+      .then((res) => res.json())
+      .then((sects) => {
+        setSections(sects);
+        sects.forEach((sec) => {
+          fetch(`${host}/secciones/${sec.id}/apps`)
+            .then((r) => r.json())
+            .then((apps) =>
+              setSectionApps((prev) => ({ ...prev, [sec.id]: apps }))
+            )
+            .catch((e) => console.error(e));
+        });
+      })
+      .catch((e) => console.error(e));
   }, []);
 
   // Función para filtrar aplicaciones
@@ -197,14 +222,35 @@ export default function SearchScreen({ navigation }) {
 
       {/* Contenido */}
       {searchText.trim() === "" ? (
-        // Mostrar todos los juegos existentes cuando no hay texto de búsqueda
-        <FlatList
-          data={appsData}
-          renderItem={renderAppItem}
-          keyExtractor={(item) => item.id.toString()}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.resultsList}
-        />
+        // Mostrar secciones con sus apps cuando no hay búsqueda activa
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {sections.map((sec) => (
+            <View
+              key={sec.id}
+              style={{ marginBottom: 20, paddingHorizontal: 20 }}
+            >
+              <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+                {" "}
+                {sec.name}{" "}
+              </Text>
+              <FlatList
+                data={
+                  Array.isArray(sectionApps[sec.id])
+                    ? sectionApps[sec.id]
+                        .map((sa) => appsData.find((a) => a.id === sa.id))
+                        .filter(Boolean)
+                    : []
+                }
+                renderItem={renderAppItem}
+                keyExtractor={(item) => item.id.toString()}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled
+                contentContainerStyle={styles.resultsList}
+              />
+            </View>
+          ))}
+        </ScrollView>
       ) : filteredApps.length > 0 ? (
         // Mostrar resultados de búsqueda
         <View style={styles.resultsContainer}>

@@ -10,6 +10,7 @@ import AuthNavigator from "./src/navigation/AuthNavigator";
 import SplashScreen from "./src/components/SplashScreen";
 import { ThemeProvider } from "./src/context/ThemeContext";
 import { UserContext } from "./src/context/UserContext";
+import { AuthProvider } from "./src/context/AuthContext"; // add AuthProvider import
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -48,21 +49,23 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <UserContext.Provider
-        value={{ usuario: usuarioGlobal, setUsuario: setUsuarioGlobal }}
-      >
-        <NavigationContainer>
-          {isAuthenticated ? (
-            <MainNavigator
-              initialRouteName={initialRoute}
-              onLogout={handleLogout}
-            />
-          ) : (
-            <AuthNavigator onLogin={handleLogin} />
-          )}
-          <StatusBar style="auto" />
-        </NavigationContainer>
-      </UserContext.Provider>
+      <AuthProvider>
+        <UserContext.Provider
+          value={{ usuario: usuarioGlobal, setUsuario: setUsuarioGlobal }}
+        >
+          <NavigationContainer>
+            {isAuthenticated ? (
+              <MainNavigator
+                initialRouteName={initialRoute}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <AuthNavigator onLogin={handleLogin} />
+            )}
+            <StatusBar style="auto" />
+          </NavigationContainer>
+        </UserContext.Provider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

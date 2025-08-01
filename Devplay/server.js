@@ -206,7 +206,10 @@ app.get("/apps", (req, res) => {
       a.is_premium   AS isPremium,
       a.is_on_sale   AS isOnSale,
       a.is_multiplayer AS isMultiplayer,
-      a.is_offline   AS isOffline
+      a.is_offline   AS isOffline,
+      (SELECT numero_version FROM version_app WHERE id_app = a.id_app ORDER BY fecha_lanzamiento DESC LIMIT 1) AS version,
+      (SELECT fecha_lanzamiento FROM version_app WHERE id_app = a.id_app ORDER BY fecha_lanzamiento DESC LIMIT 1) AS releaseDate,
+      (SELECT enlace_apk FROM version_app WHERE id_app = a.id_app ORDER BY fecha_lanzamiento DESC LIMIT 1) AS apkUrl
     FROM app a
     LEFT JOIN app_categorias ac ON a.id_app = ac.app_id_app
     LEFT JOIN categorias c ON ac.categorias_id = c.id
@@ -247,8 +250,44 @@ app.get("/apps", (req, res) => {
       isOnSale: r.isOnSale,
       isMultiplayer: r.isMultiplayer,
       isOffline: r.isOffline,
+      version: r.version,
+      releaseDate: r.releaseDate,
+      apkUrl: r.apkUrl,
     }));
     res.json(apps);
+  });
+});
+
+// RUTA GET /secciones
+app.get("/secciones", (req, res) => {
+  const sql = `SELECT id_seccion AS id, nombre AS name, descripcion FROM seccion ORDER BY id_seccion`;
+  db.query(sql, (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+// RUTA GET /secciones/:id/apps
+app.get("/secciones/:id/apps", (req, res) => {
+  const { id } = req.params;
+  const sql = `
+    SELECT
+      a.id_app AS id,
+      a.nombre AS name,
+      a.precio AS price,
+      a.rango_edad AS ageRating,
+      a.peso AS size,
+      a.descripcion AS description,
+      ac.categorias_id AS categoryId
+    FROM app a
+    JOIN app_seccion s ON s.id_app = a.id_app
+    LEFT JOIN app_categorias ac ON ac.app_id = a.id_app
+    WHERE s.id_seccion = ?
+    ORDER BY s.prioridad
+  `;
+  db.query(sql, [id], (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
   });
 });
 
@@ -267,7 +306,74 @@ app.get("/categorias", (req, res) => {
   });
 });
 
-// Inicia el servidor
-app.listen(3001, () => {
-  console.log("API corriendo en http://localhost:3001");
+// RUTA GET /apps/:id/reviews
+app.get("/apps/:id/reviews", (req, res) => {
+  const appId = req.params.id;
+  const sql = `
+    SELECT
+      v.id_valoracion AS id,
+      u.nombre AS user,
+      u.avatar AS avatar,
+      v.puntuacion AS rating,
+      v.comentario AS comment,
+      DATE_FORMAT(v.fecha, '%Y-%m-%d') AS date
+    FROM valoracion v
+    JOIN usuario u ON v.usuario_id = u.id
+    WHERE v.id_app = ?
+    ORDER BY v.fecha DESC
+  `;
+  db.query(sql, [appId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// RUTA GET /descargas
+app.get("/descargas", (req, res) => {
+  const sql = `SELECT id_descarga, id_app, fecha, cantidad FROM descarga ORDER BY fecha DESC`;
+  db.query(sql, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// RUTA POST /descargas
+app.post("/descargas", (req, res) => {
+  const { id_app } = req.body;
+  const fecha = new Date();
+  const cantidad = 1;
+  const sql = `INSERT INTO descarga (id_app, fecha, cantidad) VALUES (?, ?, ?)`;
+  db.query(sql, [id_app, fecha, cantidad], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id_descarga: result.insertId });
+  });
+});
+
+// RUTA DELETE /descargas/:id - eliminar descarga (uninstall)
+app.delete("/descargas/:id", (req, res) => {
+  const { id } = req.params;
+  const sqlDel = `DELETE FROM descarga WHERE id_descarga = ?`;
+  db.query(sqlDel, [id], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// RUTA POST /apps/:id/reviews
+app.post("/apps/:id/reviews", (req, res) => {
+  const appId = req.params.id;
+  const { usuario_id, puntuacion, comentario } = req.body;
+  const sql = `
+    INSERT INTO valoracion (id_app, usuario_id, puntuacion, comentario, fecha)
+    VALUES (?, ?, ?, ?, NOW())
+  `;
+  db.query(sql, [appId, usuario_id, puntuacion, comentario], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, reviewId: result.insertId });
+  });
+});
+
+// Inicia el servidor en todas las interfaces para permitir conexiones desde emuladores y dispositivos
+app.listen(3001, "0.0.0.0", () => {
+  console.log("API corriendo en http://0.0.0.0:3001 (todas las interfaces)");
 });
