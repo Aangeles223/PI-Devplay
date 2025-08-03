@@ -10,109 +10,42 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function HistoryScreen({ navigation }) {
   const { theme, getText } = useTheme();
   const [activeTab, setActiveTab] = useState("search");
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchHistory, setSearchHistory] = useState([]);
+  const [viewHistory, setViewHistory] = useState([]);
 
-  // Mock search history data
-  const searchHistory = [
-    {
-      id: "1",
-      query: "instagram",
-      timestamp: "2024-01-15 14:30",
-      results: 12,
-      type: "search",
-    },
-    {
-      id: "2",
-      query: "juegos gratis",
-      timestamp: "2024-01-15 12:15",
-      results: 45,
-      type: "search",
-    },
-    {
-      id: "3",
-      query: "netflix",
-      timestamp: "2024-01-14 18:45",
-      results: 3,
-      type: "search",
-    },
-    {
-      id: "4",
-      query: "editores de video",
-      timestamp: "2024-01-14 16:20",
-      results: 28,
-      type: "search",
-    },
-    {
-      id: "5",
-      query: "whatsapp",
-      timestamp: "2024-01-13 11:10",
-      results: 8,
-      type: "search",
-    },
-  ];
-
-  // Mock viewed apps history
-  const viewHistory = [
-    {
-      id: "1",
-      appName: "Instagram",
-      category: "Redes sociales",
-      timestamp: "2024-01-15 14:32",
-      icon: "logo-instagram",
-      action: "viewed",
-    },
-    {
-      id: "2",
-      appName: "TikTok",
-      category: "Entretenimiento",
-      timestamp: "2024-01-15 12:20",
-      icon: "musical-note",
-      action: "downloaded",
-    },
-    {
-      id: "3",
-      appName: "Netflix",
-      category: "Entretenimiento",
-      timestamp: "2024-01-14 18:47",
-      icon: "play-circle",
-      action: "viewed",
-    },
-    {
-      id: "4",
-      appName: "Adobe Premiere Rush",
-      category: "Fotografía y video",
-      timestamp: "2024-01-14 16:25",
-      icon: "videocam",
-      action: "viewed",
-    },
-    {
-      id: "5",
-      appName: "WhatsApp",
-      category: "Comunicación",
-      timestamp: "2024-01-13 11:12",
-      icon: "logo-whatsapp",
-      action: "downloaded",
-    },
-  ];
-
-  const tabs = [
-    {
-      id: "search",
-      titleKey: "searches",
-      count: searchHistory.length,
-      icon: "search",
-    },
-    {
-      id: "apps",
-      titleKey: "appsViewed",
-      count: viewHistory.length,
-      icon: "eye",
-    },
-  ];
+  // Load persisted history on focus
+  useFocusEffect(
+    React.useCallback(() => {
+      async function loadHistory() {
+        try {
+          const s = await AsyncStorage.getItem("searchHistory");
+          const v = await AsyncStorage.getItem("viewHistory");
+          const sArr = s ? JSON.parse(s) : [];
+          const vArr = v ? JSON.parse(v) : [];
+          // Map queries to items
+          setSearchHistory(
+            sArr.map((q, idx) => ({
+              id: idx.toString(),
+              query: q,
+              timestamp: "",
+              results: 0,
+              type: "search",
+            }))
+          );
+          setViewHistory(vArr);
+        } catch (e) {
+          console.warn("Error loading history", e);
+        }
+      }
+      loadHistory();
+    }, [])
+  );
 
   const formatDate = (timestamp) => {
     const date = new Date(timestamp);
@@ -150,12 +83,37 @@ export default function HistoryScreen({ navigation }) {
     });
   };
 
-  const clearHistory = () => {
-    console.log(`Clearing ${activeTab} history`);
+  const clearHistory = async () => {
+    try {
+      if (activeTab === "search") {
+        await AsyncStorage.removeItem("searchHistory");
+        setSearchHistory([]);
+      } else {
+        await AsyncStorage.removeItem("viewHistory");
+        setViewHistory([]);
+      }
+    } catch (e) {
+      console.warn("Error clearing history", e);
+    }
   };
 
-  const removeItem = (itemId) => {
-    console.log(`Removing item ${itemId} from ${activeTab} history`);
+  const removeItem = async (itemId) => {
+    try {
+      if (activeTab === "search") {
+        const filtered = searchHistory.filter((item) => item.id !== itemId);
+        await AsyncStorage.setItem(
+          "searchHistory",
+          JSON.stringify(filtered.map((i) => i.query))
+        );
+        setSearchHistory(filtered);
+      } else {
+        const filtered = viewHistory.filter((item) => item.id !== itemId);
+        await AsyncStorage.setItem("viewHistory", JSON.stringify(filtered));
+        setViewHistory(filtered);
+      }
+    } catch (e) {
+      console.warn("Error removing history item", e);
+    }
   };
 
   const renderSearchItem = ({ item }) => (

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,106 +9,95 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useIsFocused } from "@react-navigation/native";
 
 export default function StorageScreen({ navigation }) {
   const { theme, getText, language } = useTheme();
   const [showDetails, setShowDetails] = useState(false);
 
-  // Mock storage data focused on games
-  const storageData = {
-    total: 64, // GB
-    used: 42.8, // GB
-    available: 21.2, // GB
-    categories: [
-      {
-        id: "games",
-        name: getText("games"),
-        size: 25.4,
-        icon: "game-controller",
-        color: "#8E44AD",
-        count: 45,
-      },
-      {
-        id: "gameData",
-        name: getText("gameData"),
-        size: 8.6,
-        icon: "save",
-        color: "#007AFF",
-        count: 67,
-      },
-      {
-        id: "gameCache",
-        name: getText("gameCache"),
-        size: 3.2,
-        icon: "server",
-        color: "#FF9500",
-        count: null,
-      },
-      {
-        id: "gameDownloads",
-        name: getText("gameDownloads"),
-        size: 2.8,
-        icon: "download",
-        color: "#34C759",
-        count: 12,
-      },
-      {
-        id: "savedGames",
-        name: getText("savedGames"),
-        size: 1.9,
-        icon: "bookmark",
-        color: "#FF2D92",
-        count: 89,
-      },
-      {
-        id: "other",
-        name: "Otros",
-        size: 0.9,
-        icon: "ellipsis-horizontal",
-        color: "#666",
-        count: null,
-      },
-    ],
-  };
-
-  // Top games by storage usage
-  const topGames = [
+  // Initial storage data focused on games
+  const initialCategories = [
     {
-      id: "1",
-      name: "Call of Duty Mobile",
-      size: 4.2,
-      icon: "gun",
-      category: getText("action"),
-    },
-    {
-      id: "2",
-      name: "Genshin Impact",
-      size: 3.8,
-      icon: "sparkles",
-      category: getText("rpg"),
-    },
-    {
-      id: "3",
-      name: "Fortnite",
-      size: 3.1,
+      id: "games",
+      name: getText("games"),
+      size: 25.4,
       icon: "game-controller",
-      category: getText("action"),
+      color: "#8E44AD",
+      count: 45,
     },
     {
-      id: "4",
-      name: "Minecraft",
-      size: 2.4,
-      icon: "cube",
-      category: getText("adventure"),
+      id: "gameData",
+      name: getText("gameData"),
+      size: 8.6,
+      icon: "save",
+      color: "#007AFF",
+      count: 67,
     },
     {
-      id: "5",
-      name: "PUBG Mobile",
-      size: 2.1,
-      icon: "rifle",
-      category: getText("action"),
+      id: "gameCache",
+      name: getText("gameCache"),
+      size: 3.2,
+      icon: "server",
+      color: "#FF9500",
+      count: null,
+    },
+    {
+      id: "gameDownloads",
+      name: getText("gameDownloads"),
+      size: 2.8,
+      icon: "download",
+      color: "#34C759",
+      count: 12,
+    },
+    {
+      id: "savedGames",
+      name: getText("savedGames"),
+      size: 1.9,
+      icon: "bookmark",
+      color: "#FF2D92",
+      count: 89,
+    },
+    {
+      id: "other",
+      name: "Otros",
+      size: 0.9,
+      icon: "ellipsis-horizontal",
+      color: "#666",
+      count: null,
     },
   ];
+  const [storageData, setStorageData] = useState({
+    total: 64,
+    used: 42.8,
+    available: 21.2,
+    categories: initialCategories,
+  });
+
+  // Update gameDownloads count in real-time when screen is focused
+  const isFocused = useIsFocused();
+  useEffect(() => {
+    async function updateDownloads() {
+      try {
+        const d = await AsyncStorage.getItem("persistentDownloadingApps");
+        const p = await AsyncStorage.getItem("persistentPendingList");
+        const downloading = d ? JSON.parse(d) : [];
+        const pending = p ? JSON.parse(p) : [];
+        const totalCount = downloading.length + pending.length;
+        setStorageData((prev) => ({
+          ...prev,
+          categories: prev.categories.map((cat) =>
+            cat.id === "gameDownloads" ? { ...cat, count: totalCount } : cat
+          ),
+        }));
+      } catch (e) {
+        console.warn("Error updating downloads count", e);
+      }
+    }
+    if (isFocused) {
+      updateDownloads();
+    }
+  }, [isFocused]);
 
   const getPercentage = (size) => {
     return ((size / storageData.total) * 100).toFixed(1);
@@ -155,6 +144,45 @@ export default function StorageScreen({ navigation }) {
       </View>
     </TouchableOpacity>
   );
+
+  // Top games list for storage section
+  const topGames = [
+    {
+      id: "1",
+      name: "Call of Duty Mobile",
+      size: 4.2,
+      icon: "game-controller",
+      category: getText("action"),
+    },
+    {
+      id: "2",
+      name: "Genshin Impact",
+      size: 3.8,
+      icon: "cube",
+      category: getText("rpg"),
+    },
+    {
+      id: "3",
+      name: "Fortnite",
+      size: 3.1,
+      icon: "game-controller",
+      category: getText("action"),
+    },
+    {
+      id: "4",
+      name: "Minecraft",
+      size: 2.4,
+      icon: "cube",
+      category: getText("adventure"),
+    },
+    {
+      id: "5",
+      name: "PUBG Mobile",
+      size: 2.1,
+      icon: "game-controller",
+      category: getText("action"),
+    },
+  ];
 
   const renderTopApp = ({ item }) => (
     <TouchableOpacity
@@ -216,7 +244,6 @@ export default function StorageScreen({ navigation }) {
           <Ionicons name="settings-outline" size={24} color={theme.textColor} />
         </TouchableOpacity>
       </View>
-
       <ScrollView style={styles.content}>
         {/* Storage Overview */}
         <View
@@ -228,7 +255,7 @@ export default function StorageScreen({ navigation }) {
           <View style={styles.overviewHeader}>
             <Ionicons name="phone-portrait" size={24} color="#8E44AD" />
             <Text style={[styles.overviewTitle, { color: theme.textColor }]}>
-              {language === "es" ? "Almacenamiento de juegos" : "Game Storage"}
+              {getText("gameStorage")}
             </Text>
           </View>
 
@@ -243,7 +270,7 @@ export default function StorageScreen({ navigation }) {
                 {storageData.used} GB
               </Text>
               <Text style={[styles.usedLabel, { color: theme.textSecondary }]}>
-                {language === "es" ? "utilizados" : "used"}
+                {getText("used")}
               </Text>
             </View>
           </View>
@@ -256,11 +283,13 @@ export default function StorageScreen({ navigation }) {
                   { color: theme.textSecondary },
                 ]}
               >
-                Total
+                {" "}
+                {getText("total")}
               </Text>
               <Text
                 style={[styles.storageDetailValue, { color: theme.textColor }]}
               >
+                {" "}
                 {storageData.total} GB
               </Text>
             </View>
@@ -271,9 +300,11 @@ export default function StorageScreen({ navigation }) {
                   { color: theme.textSecondary },
                 ]}
               >
-                {language === "es" ? "Disponible" : "Available"}
+                {" "}
+                {getText("available")}
               </Text>
               <Text style={[styles.storageDetailValue, styles.availableValue]}>
+                {" "}
                 {storageData.available} GB
               </Text>
             </View>
@@ -300,144 +331,115 @@ export default function StorageScreen({ navigation }) {
             ))}
           </View>
         </View>
-
-        {/* Storage Categories */}
-        <View
-          style={[styles.section, { backgroundColor: theme.cardBackground }]}
-        >
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-              {language === "es" ? "Uso por categoría" : "Usage by category"}
-            </Text>
-            <TouchableOpacity onPress={() => setShowDetails(!showDetails)}>
-              <Text style={[styles.toggleButton, { color: theme.primary }]}>
-                {showDetails
-                  ? language === "es"
-                    ? "Ocultar detalles"
-                    : "Hide details"
-                  : language === "es"
-                  ? "Ver detalles"
-                  : "View details"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <FlatList
-            data={storageData.categories}
-            renderItem={renderStorageCategory}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-          />
-        </View>
-
-        {/* Top Games */}
-        <View
-          style={[styles.section, { backgroundColor: theme.cardBackground }]}
-        >
+      </ScrollView>
+      {/* Storage Categories */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-            {language === "es"
-              ? "Juegos que más espacio ocupan"
-              : "Games using most storage"}
+            {" "}
+            {getText("usageByCategory")}
           </Text>
-          <FlatList
-            data={topGames}
-            renderItem={renderTopApp}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-          />
-          <TouchableOpacity style={styles.viewAllButton}>
-            <Text style={[styles.viewAllText, { color: theme.primary }]}>
-              {language === "es" ? "Ver todos los juegos" : "View all games"}
+          <TouchableOpacity onPress={() => setShowDetails(!showDetails)}>
+            <Text style={[styles.toggleButton, { color: theme.primary }]}>
+              {" "}
+              {showDetails ? getText("hideDetails") : getText("viewDetails")}
             </Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.primary} />
           </TouchableOpacity>
         </View>
 
-        {/* Storage Tips */}
-        <View
-          style={[styles.section, { backgroundColor: theme.cardBackground }]}
-        >
-          <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-            {language === "es"
-              ? "Consejos para liberar espacio"
-              : "Tips to free up space"}
+        <FlatList
+          data={storageData.categories}
+          renderItem={renderStorageCategory}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+        />
+      </View>
+      {/* Top Games */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+          {" "}
+          {getText("topGames")}
+        </Text>
+        <FlatList
+          data={topGames}
+          renderItem={renderTopApp}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+        />
+        <TouchableOpacity style={styles.viewAllButton}>
+          <Text style={[styles.viewAllText, { color: theme.primary }]}>
+            {" "}
+            {getText("viewAllGames")}
           </Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.primary} />
+        </TouchableOpacity>
+      </View>
+      {/* Storage Tips */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+          {" "}
+          {getText("storageTips")}
+        </Text>
 
-          <View style={[styles.tipItem, { borderBottomColor: theme.border }]}>
-            <Ionicons name="trash-outline" size={24} color="#FF3B30" />
-            <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, { color: theme.textColor }]}>
-                {language === "es"
-                  ? "Eliminar caché de juegos"
-                  : "Clear game cache"}
-              </Text>
-              <Text
-                style={[styles.tipDescription, { color: theme.textSecondary }]}
-              >
-                {language === "es"
-                  ? "Libera hasta 3.1 GB eliminando archivos temporales de juegos"
-                  : "Free up to 3.1 GB by removing temporary game files"}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.tipButton, { backgroundColor: theme.primary }]}
+        <View style={[styles.tipItem, { borderBottomColor: theme.border }]}>
+          <Ionicons name="trash-outline" size={24} color="#FF3B30" />
+          <View style={styles.tipContent}>
+            <Text style={[styles.tipTitle, { color: theme.textColor }]}>
+              {getText("tipClearCache")}
+            </Text>
+            <Text
+              style={[styles.tipDescription, { color: theme.textSecondary }]}
             >
-              <Text style={styles.tipButtonText}>
-                {language === "es" ? "Limpiar" : "Clean"}
-              </Text>
-            </TouchableOpacity>
+              {getText("tipClearCacheDesc")}
+            </Text>
           </View>
-
-          <View style={[styles.tipItem, { borderBottomColor: theme.border }]}>
-            <Ionicons name="cloud-upload-outline" size={24} color="#007AFF" />
-            <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, { color: theme.textColor }]}>
-                {language === "es"
-                  ? "Respaldar partidas guardadas"
-                  : "Backup saved games"}
-              </Text>
-              <Text
-                style={[styles.tipDescription, { color: theme.textSecondary }]}
-              >
-                {language === "es"
-                  ? "Mueve partidas guardadas a almacenamiento en la nube"
-                  : "Move saved games to cloud storage"}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.tipButton, { backgroundColor: theme.primary }]}
-            >
-              <Text style={styles.tipButtonText}>
-                {language === "es" ? "Configurar" : "Setup"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={[styles.tipItem, { borderBottomColor: theme.border }]}>
-            <Ionicons name="download-outline" size={24} color="#34C759" />
-            <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, { color: theme.textColor }]}>
-                {language === "es" ? "Juegos sin usar" : "Unused games"}
-              </Text>
-              <Text
-                style={[styles.tipDescription, { color: theme.textSecondary }]}
-              >
-                {language === "es"
-                  ? "Elimina juegos descargados que ya no juegas"
-                  : "Remove downloaded games you no longer play"}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.tipButton, { backgroundColor: theme.primary }]}
-            >
-              <Text style={styles.tipButtonText}>
-                {language === "es" ? "Revisar" : "Review"}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={[styles.tipButton, { backgroundColor: theme.primary }]}
+          >
+            <Text style={styles.tipButtonText}>{getText("actionClean")}</Text>
+          </TouchableOpacity>
         </View>
-      </ScrollView>
-    </View>
+
+        <View style={[styles.tipItem, { borderBottomColor: theme.border }]}>
+          <Ionicons name="cloud-upload-outline" size={24} color="#007AFF" />
+          <View style={styles.tipContent}>
+            <Text style={[styles.tipTitle, { color: theme.textColor }]}>
+              {getText("tipBackupSaves")}
+            </Text>
+            <Text
+              style={[styles.tipDescription, { color: theme.textSecondary }]}
+            >
+              {getText("tipBackupSavesDesc")}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.tipButton, { backgroundColor: theme.primary }]}
+          >
+            <Text style={styles.tipButtonText}>{getText("actionSetup")}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.tipItem, { borderBottomColor: theme.border }]}>
+          <Ionicons name="download-outline" size={24} color="#34C759" />
+          <View style={styles.tipContent}>
+            <Text style={[styles.tipTitle, { color: theme.textColor }]}>
+              {getText("tipUnusedGames")}
+            </Text>
+            <Text
+              style={[styles.tipDescription, { color: theme.textSecondary }]}
+            >
+              {getText("tipUnusedGamesDesc")}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.tipButton, { backgroundColor: theme.primary }]}
+          >
+            <Text style={styles.tipButtonText}>{getText("actionReview")}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>{" "}
+      // end Storage Tips section
+    </View> // end root View
   );
 }
 

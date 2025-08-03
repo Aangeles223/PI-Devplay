@@ -86,9 +86,17 @@ export default function MainNavigator({ initialRoute = "Home", onLogout }) {
         headerShown: false, // Esta línea quita todos los headers azules
       })}
     >
-      <Tab.Screen name="Home" component={HomeStack} />
-      <Tab.Screen name="Search" component={SearchStack} />
-      <Tab.Screen name="Profile">
+      <Tab.Screen
+        name="Home"
+        component={HomeStack}
+        options={{ unmountOnBlur: false }}
+      />
+      <Tab.Screen
+        name="Search"
+        component={SearchStack}
+        options={{ unmountOnBlur: false }}
+      />
+      <Tab.Screen name="Profile" options={{ unmountOnBlur: false }}>
         {(props) => <ProfileStack {...props} onLogout={onLogout} />}
       </Tab.Screen>
     </Tab.Navigator>

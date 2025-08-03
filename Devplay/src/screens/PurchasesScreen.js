@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   FlatList,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
@@ -13,76 +14,43 @@ import { useTheme } from "../context/ThemeContext";
 export default function PurchasesScreen({ navigation }) {
   const { theme, getText } = useTheme();
   const [activeFilter, setActiveFilter] = useState("all");
-
-  // Mock data for purchases
-  const purchases = [
-    {
-      id: "1",
-      name: "Minecraft",
-      category: "Juegos",
-      price: "$6.99",
-      purchaseDate: "15 Ene 2024",
-      type: "paid",
-      icon: "game-controller",
+  const [apps, setApps] = useState([]);
+  const [downloads, setDownloads] = useState([]);
+  const host =
+    Platform.OS === "android"
+      ? "http://10.0.2.2:3001"
+      : "http://10.0.0.11:3001";
+  useEffect(() => {
+    if (!host) return;
+    fetch(`${host}/apps`)
+      .then((res) => res.json())
+      .then(setApps)
+      .catch(console.error);
+    fetch(`${host}/descargas`)
+      .then((res) => res.json())
+      .then(setDownloads)
+      .catch(console.error);
+  }, [host]);
+  // Combine downloads with app info
+  const purchases = downloads.map((d) => {
+    const app = apps.find((a) => a.id === d.id_app) || {};
+    const priceNum = parseFloat(app.price) || 0;
+    const type = priceNum > 0 ? "paid" : "free";
+    return {
+      id: d.id_descarga.toString(),
+      name: app.name,
+      category: app.category,
+      price:
+        type === "paid"
+          ? `$${priceNum.toFixed(2)}`
+          : getText("free") || "Gratis",
+      purchaseDate: new Date(d.fecha).toLocaleDateString(),
+      type,
+      icon: "download-outline",
       status: "owned",
-      orderNumber: "GPA.1234-5678-9012",
-    },
-    {
-      id: "2",
-      name: "Adobe Photoshop Express",
-      category: "Fotografía",
-      price: "Gratis",
-      purchaseDate: "12 Ene 2024",
-      type: "free",
-      icon: "image",
-      status: "owned",
-      orderNumber: "GPA.2345-6789-0123",
-    },
-    {
-      id: "3",
-      name: "Procreate",
-      category: "Diseño",
-      price: "$12.99",
-      purchaseDate: "10 Ene 2024",
-      type: "paid",
-      icon: "brush",
-      status: "owned",
-      orderNumber: "GPA.3456-7890-1234",
-    },
-    {
-      id: "4",
-      name: "WhatsApp",
-      category: "Comunicación",
-      price: "Gratis",
-      purchaseDate: "8 Ene 2024",
-      type: "free",
-      icon: "chatbubbles",
-      status: "owned",
-      orderNumber: "GPA.4567-8901-2345",
-    },
-    {
-      id: "5",
-      name: "Monument Valley",
-      category: "Juegos",
-      price: "$3.99",
-      purchaseDate: "5 Ene 2024",
-      type: "paid",
-      icon: "triangle",
-      status: "refunded",
-      orderNumber: "GPA.5678-9012-3456",
-    },
-    {
-      id: "6",
-      name: "Spotify",
-      category: "Música",
-      price: "Gratis",
-      purchaseDate: "3 Ene 2024",
-      type: "free",
-      icon: "musical-notes",
-      status: "owned",
-      orderNumber: "GPA.6789-0123-4567",
-    },
-  ];
+      orderNumber: "",
+    };
+  });
 
   const filters = [
     { id: "all", title: getText("all"), count: purchases.length },

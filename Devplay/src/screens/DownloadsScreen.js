@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+// Module-level persistent storage for downloads
+let persistentDownloadingApps = [];
 import {
   View,
   Text,
@@ -13,21 +16,20 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import Constants from "expo-constants";
 
-export default function DownloadsScreen({ navigation }) {
+export default function DownloadsScreen({ navigation, route }) {
   const { theme, getText } = useTheme();
   const [activeTab, setActiveTab] = useState("downloaded");
+  const [installHandled, setInstallHandled] = useState(false);
 
-  // Host for API: emulator vs device
-  // Host for API: emulator vs device
-  // Host for API: derive dev server IP dynamically
-  // Host for API: Android emulator or development machine on LAN
+  // Host for API: emulator vs development machine on LAN
   const host =
     Platform.OS === "android"
       ? "http://10.0.2.2:3001"
-      : "http://10.0.0.11:3001"; // Reemplaza 10.0.0.11 con la IP de tu PC en la LAN
+      : "http://10.0.0.11:3001"; // Reemplaza con la IP de tu PC en la LAN
   // Fetch all apps for mapping downloads
   const [backendApps, setBackendApps] = useState([]);
   useEffect(() => {
+    if (!host) return;
     console.log("DownloadsScreen using API host:", host);
     fetch(`${host}/apps`)
       .then((res) => res.json())
@@ -38,14 +40,27 @@ export default function DownloadsScreen({ navigation }) {
   // Real data for downloaded apps
   const [downloadedApps, setDownloadedApps] = useState([]);
   // Downloading apps state (simulate progress)
-  const [downloadingApps, setDownloadingApps] = useState([]);
+  const [downloadingApps, setDownloadingApps] = useState(
+    persistentDownloadingApps
+  );
   // Timers for download simulation
   const downloadTimers = useRef({});
   // Timeout timers for download completion
   const timeoutTimers = useRef({});
 
-  // Pending apps: those in backendApps not yet downloaded or downloading
-  const pendingApps = backendApps
+  // Pending apps: those not yet downloaded or downloading, maintain custom list
+  const [pendingAppsList, setPendingAppsList] = useState([]);
+  // Flag to initialize pending list only once
+  const initialPendingSet = useRef(false);
+  // Initialize pendingAppsList once when backendApps first loads
+  useEffect(() => {
+    if (!initialPendingSet.current && backendApps.length > 0) {
+      setPendingAppsList(backendApps);
+      initialPendingSet.current = true;
+    }
+  }, [backendApps]);
+  // Compute pending apps by filtering out downloaded and downloading
+  const pendingApps = pendingAppsList
     .filter(
       (a) =>
         !downloadedApps?.some((d) => d.appId === a.id) &&
@@ -76,6 +91,7 @@ export default function DownloadsScreen({ navigation }) {
   };
   // Load downloads from backend
   const loadDownloads = () => {
+    if (!host) return;
     fetch(`${host}/descargas`)
       .then((res) => res.json())
       .then((data) => {
@@ -98,60 +114,142 @@ export default function DownloadsScreen({ navigation }) {
   }, [host, backendApps]);
 
   const handleStartDownload = (app) => {
-    // Notify download start
     alert(`${getText("downloading") || "Descargando"}: ${app.name}`);
-    // add to downloading list and switch to downloading tab
-    setDownloadingApps((prev) => [
-      ...prev,
-      { ...app, progress: 0, status: "downloading" },
-    ]);
     setActiveTab("downloading");
-    // tick every second
+    setDownloadingApps((prev) => {
+      const updated = [...prev, { ...app, progress: 0, status: "downloading" }];
+      persistentDownloadingApps = updated;
+      return updated;
+    });
     const interval = setInterval(() => {
-      setDownloadingApps((prev) =>
-        prev.map((d) =>
+      setDownloadingApps((prev) => {
+        const updated = prev.map((d) =>
           d.id === app.id
             ? { ...d, progress: Math.min(d.progress + 100 / 240, 100) }
             : d
-        )
-      );
+        );
+        persistentDownloadingApps = updated;
+        return updated;
+      });
     }, 1000);
     downloadTimers.current[app.id] = interval;
-    // finish after 4 minutes
     const timeoutId = setTimeout(() => {
       clearInterval(downloadTimers.current[app.id]);
-      setDownloadingApps((prev) => prev.filter((d) => d.id !== app.id));
-      // Notify download completion
+      setDownloadingApps((prev) => {
+        const updated = prev.filter((d) => d.id !== app.id);
+        persistentDownloadingApps = updated;
+        return updated;
+      });
       alert(`${app.name} ${getText("downloadComplete") || "instalado"}`);
-      // record download in backend
-      fetch(`${host}/descargas`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id_app: app.id }),
-      })
-        .then((res) => res.json())
-        .then(() => loadDownloads())
-        .catch(console.error);
+      if (host) {
+        fetch(`${host}/descargas`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id_app: app.id }),
+        })
+          .then((res) => res.json())
+          .then(() => loadDownloads())
+          .catch(console.error);
+      }
     }, 240000);
     timeoutTimers.current[app.id] = timeoutId;
-    timeoutTimers.current[app.id] = timeoutId;
   };
+  // If navigated here with installApp param, start download once
+  // Start download when installApp param is received
+  useEffect(() => {
+    const appToInstall = route.params?.installApp;
+    if (appToInstall) {
+      // remove from pending
+      setPendingAppsList((prev) =>
+        prev.filter((a) => a.id !== appToInstall.id)
+      );
+      handleStartDownload(appToInstall);
+      // Clear the param to avoid re-triggering
+      navigation.setParams({ installApp: undefined });
+    }
+  }, [route.params?.installApp]);
   // Uninstall downloaded app
   const handleUninstall = (downloadId) => {
+    if (!host) return;
     fetch(`${host}/descargas/${downloadId}`, { method: "DELETE" })
       .then((res) => res.json())
       .then(() => loadDownloads())
       .catch(console.error);
   };
+  // Pause individual download and move it back to pending
+  const handlePauseDownload = (appId) => {
+    // clear timers
+    clearInterval(downloadTimers.current[appId]);
+    clearTimeout(timeoutTimers.current[appId]);
+    // find the download item
+    const paused = downloadingApps.find((d) => d.id === appId);
+    if (paused) {
+      setPendingAppsList((prev) => {
+        // avoid duplicates: remove existing then add
+        const without = prev.filter((a) => a.id !== appId);
+        return [...without, paused];
+      });
+    }
+    // remove from downloading
+    setDownloadingApps((prev) => {
+      const updated = prev.filter((d) => d.id !== appId);
+      persistentDownloadingApps = updated;
+      return updated;
+    });
+  };
+  // Pause all downloads
+  const handlePauseAll = () => {
+    downloadingApps.forEach((d) => handlePauseDownload(d.id));
+  };
+  // Download all pending
+  const handleDownloadAll = () => {
+    pendingApps.forEach((a) => {
+      // remove from pending list
+      setPendingAppsList((prev) => prev.filter((p) => p.id !== a.id));
+      handleStartDownload(a);
+    });
+  };
+  // Delete all pending (clear list)
+  const handleDeleteAllPending = () => {
+    setPendingAppsList([]);
+  };
+  // Clear download history
+  const handleClearHistory = () => {
+    downloadedApps.forEach((d) => handleUninstall(d.downloadId));
+  };
 
-  // Upon unmount, clear all timers to avoid state updates
+  // Keep download timers active when navigating away, so downloads continue in background
+  // (cleanup occurs when downloads complete or on app exit)
+  // Resume ongoing downloads on mount
   useEffect(() => {
-    return () => {
-      // Clear all download intervals
-      Object.values(downloadTimers.current).forEach((id) => clearInterval(id));
-      // Clear all completion timeouts
-      Object.values(timeoutTimers.current).forEach((id) => clearTimeout(id));
-    };
+    persistentDownloadingApps.forEach((app) => {
+      // skip if timer exists
+      if (downloadTimers.current[app.id]) return;
+      // resume progress interval
+      const interval = setInterval(() => {
+        setDownloadingApps((prev) => {
+          const updated = prev.map((d) =>
+            d.id === app.id
+              ? { ...d, progress: Math.min(d.progress + 100 / 240, 100) }
+              : d
+          );
+          persistentDownloadingApps = updated;
+          return updated;
+        });
+      }, 1000);
+      downloadTimers.current[app.id] = interval;
+      // resume timeout for remaining
+      const remaining = ((100 - app.progress) / 100) * 240000;
+      const timeoutId = setTimeout(() => {
+        clearInterval(downloadTimers.current[app.id]);
+        setDownloadingApps((prev) => prev.filter((d) => d.id !== app.id));
+        persistentDownloadingApps = persistentDownloadingApps.filter(
+          (d) => d.id !== app.id
+        );
+        alert(`${app.name} ${getText("downloadComplete") || "instalado"}`);
+      }, remaining);
+      timeoutTimers.current[app.id] = timeoutId;
+    });
   }, []);
 
   const renderDownloadedApp = ({ item }) => (
@@ -222,7 +320,10 @@ export default function DownloadsScreen({ navigation }) {
           {`${Math.round(item.progress)}%`}
         </Text>
       </View>
-      <TouchableOpacity style={styles.pauseButton}>
+      <TouchableOpacity
+        style={styles.pauseButton}
+        onPress={() => handlePauseDownload(item.id)}
+      >
         <Ionicons name="pause" size={20} color={theme.secondaryTextColor} />
       </TouchableOpacity>
     </View>
@@ -281,14 +382,24 @@ export default function DownloadsScreen({ navigation }) {
       <View style={[styles.header, { backgroundColor: theme.backgroundColor }]}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            const parentNav = navigation.getParent();
+            if (parentNav) {
+              parentNav.navigate("Profile", { screen: "ProfileMain" });
+            } else {
+              navigation.navigate("ProfileMain");
+            }
+          }}
         >
           <Ionicons name="chevron-back" size={24} color={theme.textColor} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.textColor }]}>
           {getText("downloads")}
         </Text>
-        <TouchableOpacity style={styles.settingsButton}>
+        <TouchableOpacity
+          style={styles.settingsButton}
+          onPress={() => navigation.navigate("ProfileMain")}
+        >
           <Ionicons name="settings-outline" size={24} color={theme.textColor} />
         </TouchableOpacity>
       </View>
@@ -383,13 +494,46 @@ export default function DownloadsScreen({ navigation }) {
       {/* Bottom Actions */}
       {getCurrentData().length > 0 && (
         <View style={styles.bottomActions}>
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionButtonText}>
-              {activeTab === "downloaded" && "Limpiar historial"}
-              {activeTab === "downloading" && "Pausar todo"}
-              {activeTab === "pending" && "Descargar todo"}
-            </Text>
-          </TouchableOpacity>
+          {activeTab === "pending" && (
+            <>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleDownloadAll}
+              >
+                <Text style={styles.actionButtonText}>
+                  {getText("downloadAll") || "Descargar todo"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleDeleteAllPending}
+              >
+                <Text style={styles.actionButtonText}>
+                  {getText("deleteAll") || "Eliminar todo"}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+          {activeTab === "downloading" && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handlePauseAll}
+            >
+              <Text style={styles.actionButtonText}>
+                {getText("pauseAll") || "Pausar todo"}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {activeTab === "downloaded" && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleClearHistory}
+            >
+              <Text style={styles.actionButtonText}>
+                {getText("clearHistory") || "Limpiar historial"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>
@@ -584,6 +728,9 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderTopWidth: 1,
     borderTopColor: "#f0f0f0",
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
   },
   actionButtonText: {
     fontSize: 16,

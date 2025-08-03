@@ -330,7 +330,11 @@ app.get("/apps/:id/reviews", (req, res) => {
 
 // RUTA GET /descargas
 app.get("/descargas", (req, res) => {
-  const sql = `SELECT id_descarga, id_app, fecha, cantidad FROM descarga ORDER BY fecha DESC`;
+  const sql = `
+    SELECT id_descarga, id_app, fecha, cantidad, instalada, fecha_install
+    FROM descarga
+    ORDER BY fecha DESC
+  `;
   db.query(sql, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
@@ -342,7 +346,11 @@ app.post("/descargas", (req, res) => {
   const { id_app } = req.body;
   const fecha = new Date();
   const cantidad = 1;
-  const sql = `INSERT INTO descarga (id_app, fecha, cantidad) VALUES (?, ?, ?)`;
+  // Marca la descarga como instalada con fecha actual
+  const sql = `
+    INSERT INTO descarga (id_app, fecha, cantidad, instalada, fecha_install)
+    VALUES (?, ?, ?, 1, NOW())
+  `;
   db.query(sql, [id_app, fecha, cantidad], (err, result) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true, id_descarga: result.insertId });
@@ -370,6 +378,22 @@ app.post("/apps/:id/reviews", (req, res) => {
   db.query(sql, [appId, usuario_id, puntuacion, comentario], (err, result) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true, reviewId: result.insertId });
+  });
+});
+
+// RUTA GET /notificaciones - obtener notificaciones por usuario
+app.get("/notificaciones", (req, res) => {
+  const usuarioId = req.query.usuario_id;
+  let sql = `SELECT id, descripcion, fecha_creacion, usuario_id, status_id FROM notificaciones`;
+  const params = [];
+  if (usuarioId) {
+    sql += ` WHERE usuario_id = ?`;
+    params.push(usuarioId);
+  }
+  sql += ` ORDER BY fecha_creacion DESC`;
+  db.query(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
   });
 });
 

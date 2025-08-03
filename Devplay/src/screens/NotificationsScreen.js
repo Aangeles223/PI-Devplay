@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   Text,
@@ -6,18 +6,45 @@ import {
   TouchableOpacity,
   ScrollView,
   Switch,
+  Platform,
+  FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
+import { UserContext } from "../context/UserContext";
+// API host resolution (matches PurchasesScreen)
+const host =
+  Platform.OS === "android" ? "http://10.0.2.2:3001" : "http://10.0.0.11:3001";
 
 export default function NotificationsScreen({ navigation }) {
   const { theme, getText } = useTheme();
+  const { usuario } = useContext(UserContext);
   const [notifications, setNotifications] = useState({
     newGames: true,
     offers: true,
     downloads: false,
     updates: true,
   });
+  const [notificationsList, setNotificationsList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadNotifications() {
+      setLoading(true);
+      try {
+        const url = `${host}/notificaciones?usuario_id=${usuario.id}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        console.log("Fetched notificationsList:", data);
+        setNotificationsList(data);
+        setLoading(false);
+      } catch (e) {
+        console.warn("Error fetching notifications", e);
+        setLoading(false);
+      }
+    }
+    if (usuario) loadNotifications();
+  }, [usuario]);
 
   const handleToggle = (key) => {
     setNotifications((prev) => ({
@@ -57,33 +84,6 @@ export default function NotificationsScreen({ navigation }) {
     },
   ];
 
-  const recentNotifications = [
-    {
-      id: 1,
-      title: "🎮 " + getText("newGameAvailable"),
-      description: getText("codNewSeason"),
-      time: getText("hoursAgo", "2"),
-      icon: "game-controller",
-      color: "#4CAF50",
-    },
-    {
-      id: 2,
-      title: "💰 " + getText("specialOffer"),
-      description: getText("minecraftDiscount"),
-      time: getText("hoursAgo", "5"),
-      icon: "pricetag",
-      color: "#FF9800",
-    },
-    {
-      id: 3,
-      title: "⬇️ " + getText("downloadComplete"),
-      description: getText("pubgDownloaded"),
-      time: getText("yesterday"),
-      icon: "checkmark-circle",
-      color: "#2196F3",
-    },
-  ];
-
   return (
     <View
       style={[styles.container, { backgroundColor: theme.backgroundColor }]}
@@ -102,106 +102,184 @@ export default function NotificationsScreen({ navigation }) {
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Settings Section */}
-        <View
-          style={[styles.section, { backgroundColor: theme.cardBackground }]}
-        >
-          <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-            {getText("configuration")}
-          </Text>
-          {notificationItems.map((item) => (
-            <View
-              key={item.id}
-              style={[
-                styles.settingItem,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderBottomColor: theme.border,
-                },
-              ]}
-            >
-              <View style={styles.settingLeft}>
-                <Ionicons name={item.icon} size={24} color={theme.iconColor} />
-                <View style={styles.settingText}>
-                  <Text
-                    style={[styles.settingTitle, { color: theme.textColor }]}
-                  >
-                    {item.title}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.settingDescription,
-                      { color: theme.secondaryTextColor },
-                    ]}
-                  >
-                    {item.description}
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={notifications[item.key]}
-                onValueChange={() => handleToggle(item.key)}
-                trackColor={{ false: "#767577", true: "#007AFF" }}
-                thumbColor={notifications[item.key] ? "#fff" : "#f4f3f4"}
-              />
-            </View>
-          ))}
-        </View>
-
-        {/* Recent Notifications */}
-        <View
-          style={[styles.section, { backgroundColor: theme.cardBackground }]}
-        >
-          <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-            {getText("recentNotifications")}
-          </Text>
-          {recentNotifications.map((notification) => (
-            <TouchableOpacity
-              key={notification.id}
-              style={[
-                styles.notificationItem,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderBottomColor: theme.border,
-                },
-              ]}
-            >
+      {loading ? (
+        <View style={styles.content}>
+          {/* Settings Section */}
+          <View
+            style={[styles.section, { backgroundColor: theme.cardBackground }]}
+          >
+            <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+              {getText("configuration")}
+            </Text>
+            {notificationItems.map((item) => (
               <View
+                key={item.id}
                 style={[
-                  styles.notificationIcon,
-                  { backgroundColor: notification.color },
+                  styles.settingItem,
+                  {
+                    backgroundColor: theme.cardBackground,
+                    borderBottomColor: theme.border,
+                  },
                 ]}
               >
-                <Ionicons name={notification.icon} size={20} color="white" />
+                <View style={styles.settingLeft}>
+                  <Ionicons
+                    name={item.icon}
+                    size={24}
+                    color={theme.iconColor}
+                  />
+                  <View style={styles.settingText}>
+                    <Text
+                      style={[styles.settingTitle, { color: theme.textColor }]}
+                    >
+                      {item.title}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.settingDescription,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      {item.description}
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={notifications[item.key]}
+                  onValueChange={() => handleToggle(item.key)}
+                  trackColor={{ false: "#767577", true: "#007AFF" }}
+                  thumbColor={notifications[item.key] ? "#fff" : "#f4f3f4"}
+                />
+              </View>
+            ))}
+          </View>
+          {/* Loading Indicator */}
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
+            {getText("loading")}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={notificationsList}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={{
+            flexGrow: 1,
+            backgroundColor: theme.backgroundColor,
+          }}
+          ListHeaderComponent={() => (
+            <>
+              {/* Settings Section */}
+              <View
+                style={[
+                  styles.section,
+                  { backgroundColor: theme.cardBackground },
+                ]}
+              >
+                <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+                  {getText("configuration")}
+                </Text>
+                {notificationItems.map((item) => (
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.settingItem,
+                      {
+                        backgroundColor: theme.cardBackground,
+                        borderBottomColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <View style={styles.settingLeft}>
+                      <Ionicons
+                        name={item.icon}
+                        size={24}
+                        color={theme.iconColor}
+                      />
+                      <View style={styles.settingText}>
+                        <Text
+                          style={[
+                            styles.settingTitle,
+                            { color: theme.textColor },
+                          ]}
+                        >
+                          {item.title}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.settingDescription,
+                            { color: theme.textSecondary },
+                          ]}
+                        >
+                          {item.description}
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch
+                      value={notifications[item.key]}
+                      onValueChange={() => handleToggle(item.key)}
+                      trackColor={{ false: "#767577", true: "#007AFF" }}
+                      thumbColor={notifications[item.key] ? "#fff" : "#f4f3f4"}
+                    />
+                  </View>
+                ))}
+              </View>
+              {/* Notifications Title */}
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: theme.textColor, marginVertical: 10 },
+                ]}
+              >
+                {getText("recentNotifications")}
+              </Text>
+            </>
+          )}
+          ListEmptyComponent={() => (
+            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+              {getText("noNotifications")}
+            </Text>
+          )}
+          ItemSeparatorComponent={() => (
+            <View
+              style={[styles.separator, { backgroundColor: theme.border }]}
+            />
+          )}
+          renderItem={({ item }) => (
+            <View
+              style={[
+                styles.notificationItem,
+                { backgroundColor: theme.cardBackground },
+              ]}
+            >
+              <View style={styles.notificationIcon}>
+                <Ionicons
+                  name="notifications-outline"
+                  size={24}
+                  color={theme.primary}
+                />
               </View>
               <View style={styles.notificationContent}>
                 <Text
-                  style={[styles.notificationTitle, { color: theme.textColor }]}
-                >
-                  {notification.title}
-                </Text>
-                <Text
                   style={[
                     styles.notificationDescription,
-                    { color: theme.secondaryTextColor },
+                    { color: theme.textColor },
                   ]}
                 >
-                  {notification.description}
+                  {item.descripcion}
                 </Text>
                 <Text
                   style={[
                     styles.notificationTime,
-                    { color: theme.secondaryTextColor },
+                    { color: theme.textSecondary },
                   ]}
                 >
-                  {notification.time}
+                  {new Date(item.fecha_creacion).toLocaleString()}
                 </Text>
               </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
+            </View>
+          )}
+        />
+      )}
     </View>
   );
 }
@@ -270,7 +348,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 15,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0,
   },
   notificationIcon: {
     width: 40,
@@ -294,5 +372,34 @@ const styles = StyleSheet.create({
   },
   notificationTime: {
     fontSize: 12,
+  },
+  // Separator between items
+  separator: {
+    height: 1,
+    width: "100%",
+  },
+  // Text when no notifications
+  emptyText: {
+    fontSize: 14,
+    textAlign: "center",
+    paddingVertical: 20,
+  },
+  // Text while loading notifications
+  loadingText: {
+    fontSize: 14,
+    textAlign: "center",
+    paddingVertical: 20,
+  },
+  loadingText: {
+    textAlign: "center",
+    paddingVertical: 20,
+  },
+  emptyText: {
+    textAlign: "center",
+    paddingVertical: 20,
+  },
+  separator: {
+    height: 1,
+    width: "100%",
   },
 });

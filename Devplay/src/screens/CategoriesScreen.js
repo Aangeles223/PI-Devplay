@@ -17,6 +17,23 @@ export default function CategoriesScreen({ route, navigation }) {
   const [appsData, setAppsData] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Install/download handler: simulate download and navigate to Downloads screen
+  const handleInstall = (app) => {
+    alert(getText("installing") || `Instalando ${app.name}`);
+    const parentNav = navigation.getParent();
+    if (parentNav) {
+      parentNav.navigate("Profile", {
+        screen: "Downloads",
+        params: { installApp: app },
+      });
+    } else {
+      navigation.navigate("Profile", {
+        screen: "Downloads",
+        params: { installApp: app },
+      });
+    }
+  };
+
   useEffect(() => {
     fetch("http://10.0.0.11:3001/apps")
       .then((res) => res.json())
@@ -77,6 +94,7 @@ export default function CategoriesScreen({ route, navigation }) {
             styles.installButton,
             item.isFree ? styles.freeButton : styles.paidButton,
           ]}
+          onPress={() => handleInstall(item)} // Attach install handler
         >
           <Text style={styles.installButtonText}>
             {item.isFree ? getText("install") : item.price}

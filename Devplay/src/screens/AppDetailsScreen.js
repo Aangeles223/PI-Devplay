@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -24,13 +24,12 @@ const { width } = Dimensions.get("window");
 export default function AppDetailsScreen({ navigation, route }) {
   const { theme, getText, language, getGameText } = useTheme();
   const { usuario: user } = useContext(UserContext);
-  // Host for API: derive dev server IP dynamically
-  const localhost =
-    Constants.manifest?.debuggerHost?.split(":")[0] ?? "localhost";
+  // Host for API: derive LAN IP of dev machine via debuggerHost
+  // Host for API: emulator vs development machine on LAN
   const host =
     Platform.OS === "android"
       ? "http://10.0.2.2:3001"
-      : `http://${localhost}:3001`;
+      : "http://10.0.0.11:3001"; // Reemplaza con la IP de tu PC en la LAN
   const { app } = route.params || {};
 
   // Compute header image source (backend icon or static image)
@@ -66,12 +65,8 @@ export default function AppDetailsScreen({ navigation, route }) {
   const [sections, setSections] = useState([]);
   const [sectionApps, setSectionApps] = useState({});
   const [backendApps, setBackendApps] = useState([]);
-  // Track if this app is already downloaded
-  const [isDownloaded, setIsDownloaded] = useState(false);
-  // Simulate download state
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const downloadTimerRef = useRef(null);
+  // Track download record with instalada flag
+  const [downloadRecord, setDownloadRecord] = useState(null);
 
   // Reset screenshot modal when switching apps
   useEffect(() => {
@@ -80,6 +75,7 @@ export default function AppDetailsScreen({ navigation, route }) {
   }, [app.id]);
   // Fetch all apps from backend for section rendering
   useEffect(() => {
+    if (!host) return;
     fetch(`${host}/apps`)
       .then((res) => res.json())
       .then((data) => setBackendApps(data))
@@ -88,14 +84,16 @@ export default function AppDetailsScreen({ navigation, route }) {
 
   // Fetch reviews from backend
   useEffect(() => {
+    if (!host) return;
     fetch(`${host}/apps/${app.id}/reviews`)
       .then((res) => res.json())
       .then((data) => setReviews(data))
       .catch(console.error);
-  }, [app.id]);
+  }, [host, app.id]);
 
   // Fetch sections and their apps
   useEffect(() => {
+    if (!host) return;
     fetch(`${host}/secciones`)
       .then((res) => res.json())
       .then((sects) => {
@@ -121,17 +119,25 @@ export default function AppDetailsScreen({ navigation, route }) {
   }, [host]);
 
   // On mount, check download status
-  useEffect(() => {
+  // Load download record (instalada flag) on mount
+  const fetchDownloadRecord = () => {
+    if (!host) return;
     fetch(`${host}/descargas`)
       .then((res) => res.json())
       .then((data) => {
-        const found = Array.isArray(data)
-          ? data.some((d) => d.id_app === app.id)
-          : false;
-        setIsDownloaded(found);
+        if (Array.isArray(data)) {
+          const rec = data.find((d) => d.id_app === app.id) || null;
+          setDownloadRecord(rec);
+        }
       })
       .catch(console.error);
-  }, [host, app.id]);
+  };
+  useEffect(fetchDownloadRecord, [host, app.id]);
+  // Re-fetch when returning to this screen
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", fetchDownloadRecord);
+    return unsubscribe;
+  }, [navigation, host, app.id]);
 
   if (!app) return <Text>Error: App no encontrada</Text>;
 
@@ -189,35 +195,21 @@ export default function AppDetailsScreen({ navigation, route }) {
 
   // Simulate download: register download in backend after progress
   const handleDownload = () => {
-    if (isDownloading) return;
-    setIsDownloading(true);
-    setDownloadProgress(0);
-    // progress every second (4 minutes total -> 240s)
-    downloadTimerRef.current = setInterval(() => {
-      setDownloadProgress((prev) => {
-        const next = prev + 100 / 240;
-        if (next >= 100) {
-          clearInterval(downloadTimerRef.current);
-          setDownloadProgress(100);
-          setIsDownloading(false);
-          // record download in backend
-          fetch(`${host}/descargas`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id_app: app.id }),
-          })
-            .then((res) => res.json())
-            .then((resJson) => {
-              if (resJson.success) {
-                setIsDownloaded(true);
-                alert(getText("downloadComplete") || "Descarga completada");
-              }
-            })
-            .catch(console.error);
-        }
-        return next;
+    // Show immediate download alert and navigate to Downloads screen under Profile tab
+    alert(getText("downloading") || `Descargando ${app.name}`);
+    // Navigate to Profile tab's Downloads screen
+    const parentNav = navigation.getParent();
+    if (parentNav) {
+      parentNav.navigate("Profile", {
+        screen: "Downloads",
+        params: { installApp: app },
       });
-    }, 1000);
+    } else {
+      navigation.navigate("Profile", {
+        screen: "Downloads",
+        params: { installApp: app },
+      });
+    }
   };
 
   // Calcular rating a mostrar: usar rating de la API o promedio de reseñas simuladas
@@ -753,18 +745,23 @@ export default function AppDetailsScreen({ navigation, route }) {
           </View>
         ))}
 
-        {/* Install / Open Button */}
+        {/* Install / Installed Button */}
         <TouchableOpacity
           style={styles.installButton}
-          onPress={isDownloaded ? handleOpen : handleDownload}
-          disabled={isDownloading}
+          onPress={
+            downloadRecord
+              ? downloadRecord.instalada === 1
+                ? handleOpen
+                : handleDownload
+              : handleDownload
+          }
         >
           <Text style={styles.installButtonText}>
-            {isDownloaded
-              ? getText("open") || "Abrir"
-              : isDownloading
-              ? `${Math.round(downloadProgress)}%`
-              : getText("download") || "Descargar"}
+            {downloadRecord
+              ? downloadRecord.instalada === 1
+                ? getText("installed") || "Instalada"
+                : `${getText("downloading") || "Instalando"}...`
+              : getText("download") || "Instalar"}
           </Text>
         </TouchableOpacity>
       </ScrollView>

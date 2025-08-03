@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Platform } from "react-native";
 import {
   View,
   Text,
@@ -34,6 +35,13 @@ export default function HomeScreen() {
   const [searchText, setSearchText] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  // Download records state
+  const [downloadRecords, setDownloadRecords] = useState([]);
+  // Compute API host
+  const host =
+    Platform.OS === "android"
+      ? "http://10.0.2.2:3001"
+      : "http://10.0.0.11:3001";
 
   const handleSearch = (text) => {
     setSearchText(text);
@@ -63,12 +71,53 @@ export default function HomeScreen() {
     // si quieres ocultar al perder foco:
     // setShowSearchResults(false);
   };
+  // Fetch download records on mount and when screen is focused
+  useEffect(() => {
+    if (!host) return;
+    const fetchDownloads = () => {
+      fetch(`${host}/descargas`)
+        .then((res) => res.json())
+        .then((data) => setDownloadRecords(Array.isArray(data) ? data : []))
+        .catch(console.error);
+    };
+    fetchDownloads();
+    const unsubscribe = navigation.addListener("focus", fetchDownloads);
+    return unsubscribe;
+  }, [host, navigation]);
+
+  // Handle install button press: alert and navigate to Downloads
+  const handleInstall = (item) => {
+    alert(getText("downloading") || `Descargando ${item.name}`);
+    const parentNav = navigation.getParent();
+    if (parentNav) {
+      parentNav.navigate("Profile", {
+        screen: "Downloads",
+        params: { installApp: item },
+      });
+    } else {
+      navigation.navigate("Profile", {
+        screen: "Downloads",
+        params: { installApp: item },
+      });
+    }
+  };
+
+  // Determine install button label based on download record
+  const getInstallLabel = (item) => {
+    const rec = downloadRecords.find((d) => d.id_app === item.id);
+    if (rec) {
+      return rec.instalada === 1
+        ? getText("installed") || "Instalada"
+        : `${getText("downloading") || "Instalando"}...`;
+    }
+    return getText("install") || "Instalar";
+  };
 
   // Al montar, carga los datos estáticos y desactiva el loading
   useEffect(() => {
     // 1) Cargamos apps
     // Cargamos apps desde API
-    fetch("http://10.0.0.11:3001/apps")
+    fetch(`${host}/apps`)
       .then((res) => res.json())
       .then((data) => {
         if (!Array.isArray(data)) {
@@ -82,7 +131,7 @@ export default function HomeScreen() {
       .catch(() => setLoading(false));
 
     // 2) Cargamos categorías y formateamos con validación
-    fetch("http://10.0.0.11:3001/categorias")
+    fetch(`${host}/categorias`)
       .then((res) => {
         if (!res.ok) {
           // Leer el mensaje de error devuelto por el servidor
@@ -158,9 +207,12 @@ export default function HomeScreen() {
         <View style={styles.trendingInfo}>
           <Text style={styles.trendingTitle}>{item.name}</Text>
           <Text style={styles.trendingDeveloper}>{item.developer}</Text>
-          <TouchableOpacity style={styles.installButtonSmall}>
+          <TouchableOpacity
+            style={styles.installButtonSmall}
+            onPress={() => handleInstall(item)}
+          >
             <Text style={styles.installButtonTextSmall}>
-              {getText("install") || "Instalar"}
+              {getInstallLabel(item)}
             </Text>
           </TouchableOpacity>
         </View>
@@ -268,9 +320,10 @@ export default function HomeScreen() {
                   paddingHorizontal: 12,
                 },
               ]}
+              onPress={() => handleInstall(item)}
             >
               <Text style={styles.installButtonText}>
-                {getText("install") || "Instalar"}
+                {getInstallLabel(item)}
               </Text>
             </TouchableOpacity>
           </View>
@@ -306,10 +359,11 @@ export default function HomeScreen() {
           {app.developer}
         </Text>
       </View>
-      <TouchableOpacity style={styles.miniInstallButton}>
-        <Text style={styles.miniInstallButtonText}>
-          {getText("install") || "Instalar"}
-        </Text>
+      <TouchableOpacity
+        style={styles.miniInstallButton}
+        onPress={() => handleInstall(app)}
+      >
+        <Text style={styles.miniInstallButtonText}>{getInstallLabel(app)}</Text>
       </TouchableOpacity>
     </TouchableOpacity>
   );
