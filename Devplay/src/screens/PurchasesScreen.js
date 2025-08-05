@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
+import { getApps, getDescargas } from "../services/api";
 
 export default function PurchasesScreen({ navigation }) {
   const { theme, getText } = useTheme();
@@ -21,16 +22,13 @@ export default function PurchasesScreen({ navigation }) {
       ? "http://10.0.2.2:3001"
       : "http://10.0.0.11:3001";
   useEffect(() => {
-    if (!host) return;
-    fetch(`${host}/apps`)
-      .then((res) => res.json())
-      .then(setApps)
+    getApps()
+      .then((res) => setApps(res.data))
       .catch(console.error);
-    fetch(`${host}/descargas`)
-      .then((res) => res.json())
-      .then(setDownloads)
+    getDescargas()
+      .then((res) => setDownloads(res.data))
       .catch(console.error);
-  }, [host]);
+  }, []);
   // Combine downloads with app info
   const purchases = downloads.map((d) => {
     const app = apps.find((a) => a.id === d.id_app) || {};

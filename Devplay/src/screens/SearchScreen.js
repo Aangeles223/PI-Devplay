@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
+import { getApps, getAllSecciones, getAppsDeSeccion } from "../services/api";
 
 export default function SearchScreen({ navigation }) {
   const { theme, getText } = useTheme();
@@ -29,17 +30,12 @@ export default function SearchScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [sections, setSections] = useState([]);
   const [sectionApps, setSectionApps] = useState({});
-  const host =
-    Platform.OS === "android"
-      ? "http://10.0.2.2:3001"
-      : "http://10.0.0.11:3001";
 
   // Obtener apps desde el backend al montar
   useEffect(() => {
-    fetch(`${host}/apps`)
-      .then((res) => res.json())
-      .then((data) => {
-        setAppsData(data);
+    getApps()
+      .then((res) => {
+        setAppsData(res.data);
         setLoading(false);
       })
       .catch((error) => {
@@ -49,20 +45,28 @@ export default function SearchScreen({ navigation }) {
   }, []);
   // Obtener secciones y sus apps
   useEffect(() => {
-    fetch(`${host}/secciones`)
-      .then((res) => res.json())
-      .then((sects) => {
-        setSections(sects);
-        sects.forEach((sec) => {
-          fetch(`${host}/secciones/${sec.id}/apps`)
-            .then((r) => r.json())
-            .then((apps) =>
-              setSectionApps((prev) => ({ ...prev, [sec.id]: apps }))
-            )
-            .catch((e) => console.error(e));
+    getAllSecciones()
+      .then((res) => {
+        // Map section objects to ensure id field exists (use id, id_seccion or seccion_id)
+        const mappedSects = res.data
+          .map((sec) => {
+            const id = sec.id ?? sec.id_seccion ?? sec.seccion_id;
+            return { ...sec, id };
+          })
+          .filter((sec) => sec.id != null);
+        setSections(mappedSects);
+        // Fetch apps for each section by normalized id
+        mappedSects.forEach((sec) => {
+          getAppsDeSeccion(sec.id)
+            .then((r) => {
+              setSectionApps((prev) => ({ ...prev, [sec.id]: r.data }));
+            })
+            .catch((e) =>
+              console.error(`Error loading apps for section ${sec.id}:`, e)
+            );
         });
       })
-      .catch((e) => console.error(e));
+      .catch((e) => console.error("Error loading sections:", e));
   }, []);
 
   // Función para filtrar aplicaciones
@@ -224,9 +228,9 @@ export default function SearchScreen({ navigation }) {
       {searchText.trim() === "" ? (
         // Mostrar secciones con sus apps cuando no hay búsqueda activa
         <ScrollView showsVerticalScrollIndicator={false}>
-          {sections.map((sec) => (
+          {sections.map((sec, index) => (
             <View
-              key={sec.id}
+              key={sec.id ?? index}
               style={{ marginBottom: 20, paddingHorizontal: 20 }}
             >
               <Text style={[styles.sectionTitle, { color: theme.textColor }]}>

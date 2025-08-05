@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   View,
   Text,
@@ -13,9 +13,12 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { UserContext } from "../context/UserContext";
+import { registerUser, loginUser, getCurrentUser } from "../services/api";
 
 export default function RegisterScreen({ navigation, onLogin }) {
   const { theme, getText } = useTheme();
+  const { setUsuario } = useContext(UserContext);
   const [formData, setFormData] = useState({
     name: "",
     username: "",
@@ -88,38 +91,27 @@ export default function RegisterScreen({ navigation, onLogin }) {
     }
 
     try {
-      const response = await fetch("http://10.0.0.11:3001/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre: name,
-          correo: email,
-          contraseña: password,
-          status_id: 1,
-          telefono: phone,
-          pais: country,
-          direccion: address,
-          genero: gender,
-          fecha_nacimiento: birthDate,
-        }),
-      });
-
-      let data;
-      try {
-        data = await response.json();
-      } catch (jsonError) {
-        Alert.alert("Error", "Respuesta inválida del servidor");
-        return;
-      }
-
-      if (response.ok && data.success) {
-        Alert.alert("Registro exitoso", "Ya puedes iniciar sesión");
-        navigation.navigate("Login");
-      } else {
-        Alert.alert("Error", data.error || "No se pudo registrar");
-      }
+      const params = {
+        nombre: name,
+        correo: email,
+        contraseña: password,
+        status_id: 1,
+        telefono: phone,
+        pais: country,
+        direccion: address,
+        genero: gender,
+        fecha_nacimiento: birthDate,
+      };
+      await registerUser(params);
+      // Auto-login after register
+      const loginRes = await loginUser({ username: email, password });
+      const token = loginRes.data.access_token;
+      const userRes = await getCurrentUser(token);
+      const user = userRes.data;
+      setUsuario({ ...user, token });
+      onLogin({ ...user, token });
     } catch (error) {
-      Alert.alert("Error", error.message || "No se pudo conectar al servidor");
+      Alert.alert("Error", error.response?.data?.detail || error.message);
     }
   };
 

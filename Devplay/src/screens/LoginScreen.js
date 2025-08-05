@@ -13,6 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { UserContext } from "../context/UserContext";
+import { loginUser, getCurrentUser } from "../services/api";
 
 export default function LoginScreen({ navigation, onLogin }) {
   const { theme, getText } = useTheme();
@@ -29,33 +30,14 @@ export default function LoginScreen({ navigation, onLogin }) {
     }
 
     try {
-      const response = await fetch("http://10.0.0.11:3001/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          correo: email,
-          contraseña: password,
-        }),
-      });
-
-      // Verifica si la respuesta es válida JSON
-      let data;
-      try {
-        data = await response.json();
-      } catch (jsonError) {
-        Alert.alert("Error", "Respuesta inválida del servidor");
-        return;
-      }
-
-      // Verifica si la petición fue exitosa
-      if (response.ok && data.success) {
-        setUsuario(data.usuario); // <-- Esto guarda el usuario en el contexto
-        onLogin(data.usuario); // dispara en App.js el salto a MainNavigator
-      } else {
-        Alert.alert("Error", data.error || "Credenciales incorrectas");
-      }
+      const loginRes = await loginUser({ correo: email, contraseña: password });
+      const token = loginRes.data.access_token;
+      const userRes = await getCurrentUser(token);
+      const user = userRes.data;
+      setUsuario({ ...user, token });
+      onLogin({ ...user, token });
     } catch (error) {
-      Alert.alert("Error", error.message || "No se pudo conectar al servidor");
+      Alert.alert("Error", error.response?.data?.detail || error.message);
     }
   };
 

@@ -15,6 +15,12 @@ import { Picker } from "@react-native-picker/picker"; // <--- import Picker
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { UserContext } from "../context/UserContext";
+import {
+  getAllPaises,
+  getAllGeneros,
+  updateUser,
+  getAllUsers,
+} from "../services/api";
 
 export default function ProfileScreen({ navigation, route, onLogout }) {
   const { theme, getText, language } = useTheme();
@@ -35,26 +41,26 @@ export default function ProfileScreen({ navigation, route, onLogout }) {
   // 1) Obtener datos del usuario
   useEffect(() => {
     if (!userEmail) return;
-    const emailEsc = encodeURIComponent(userEmail);
-    fetch(`http://10.0.0.11:3001/usuario/${emailEsc}`)
-      .then((r) => r.json())
-      .then((data) => setProfileData(data))
+    getAllUsers()
+      .then((res) => {
+        const user = res.data.find((u) => u.correo === userEmail);
+        if (user) setProfileData(user);
+        else setProfileData({ error: "Usuario no encontrado" });
+      })
       .catch((err) => {
         console.warn("Error al traer perfil:", err);
-        setProfileData(null);
+        setProfileData({ error: "Error al cargar perfil" });
       });
   }, [userEmail]);
 
   // 2) Cargar países y géneros
   useEffect(() => {
-    fetch("http://10.0.0.11:3001/paises")
-      .then((r) => r.json())
-      .then(setCountries)
+    getAllPaises()
+      .then((r) => setCountries(r.data))
       .catch(console.warn);
 
-    fetch("http://10.0.0.11:3001/generos")
-      .then((r) => r.json())
-      .then(setGenders)
+    getAllGeneros()
+      .then((r) => setGenders(r.data))
       .catch(console.warn);
   }, []);
 
@@ -75,24 +81,20 @@ export default function ProfileScreen({ navigation, route, onLogout }) {
       fecha_nacimiento: profileData.fecha_nacimiento?.slice(0, 10) || null,
     };
 
-    fetch(`http://10.0.0.11:3001/usuario/${profileData.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updatedData),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success) {
-          setProfileData(data.usuario);
-          Alert.alert(
-            "Perfil actualizado",
-            "Los cambios se guardaron con éxito."
-          );
-        } else {
-          Alert.alert("Error", "No se pudo actualizar el perfil.");
-        }
+    updateUser(profileData.id, updatedData)
+      .then((res) => {
+        setProfileData(res.data.usuario);
+        Alert.alert(
+          getText("profileUpdated") || "Perfil actualizado",
+          getText("changesSaved") || "Los cambios se guardaron con éxito."
+        );
       })
-      .catch(() => Alert.alert("Error", "No se pudo conectar al servidor."));
+      .catch(() =>
+        Alert.alert(
+          getText("error") || "Error",
+          getText("connectionError") || "No se pudo conectar al servidor."
+        )
+      );
   };
 
   const handleEditProfile = () => {
@@ -104,10 +106,11 @@ export default function ProfileScreen({ navigation, route, onLogout }) {
     setIsEditing(false);
     // Opcional: recargar datos del usuario
     if (userEmail) {
-      console.log("Correo enviado al backend:", userEmail);
-      fetch(`http://10.0.0.11:3001/usuario/${userEmail}`)
-        .then((res) => res.json())
-        .then((data) => setProfileData(data))
+      getAllUsers()
+        .then((res) => {
+          const user = res.data.find((u) => u.correo === userEmail);
+          if (user) setProfileData(user);
+        })
         .catch(() => {});
     }
   };

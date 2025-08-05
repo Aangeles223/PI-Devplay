@@ -10,7 +10,9 @@ export default function AuthNavigator({ onLogin }) {
       <Stack.Screen name="Login">
         {(props) => <LoginScreen {...props} onLogin={onLogin} />}
       </Stack.Screen>
-      <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="Register">
+        {(props) => <RegisterScreen {...props} onLogin={onLogin} />}
+      </Stack.Screen>
     </Stack.Navigator>
   );
 }

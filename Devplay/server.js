@@ -401,3 +401,9 @@ app.get("/notificaciones", (req, res) => {
 app.listen(3001, "0.0.0.0", () => {
   console.log("API corriendo en http://0.0.0.0:3001 (todas las interfaces)");
 });
+
+// Iniciar servidor en el puerto 3001
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Servidor Express escuchando en el puerto ${PORT}`);
+});

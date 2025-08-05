@@ -8,7 +8,10 @@ export default function AppCard({ app, price }) {
     <TouchableOpacity
       style={[styles.card, { backgroundColor: theme.cardBackground }]}
     >
-      <Image source={app.icon} style={styles.icon} />
+      <Image
+        source={app.icon ? { uri: app.icon } : require("../../assets/icon.png")}
+        style={styles.icon}
+      />
       <View style={styles.info}>
         <Text
           style={[styles.name, { color: theme.textColor }]}

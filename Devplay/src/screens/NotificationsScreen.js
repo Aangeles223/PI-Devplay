@@ -12,9 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { UserContext } from "../context/UserContext";
-// API host resolution (matches PurchasesScreen)
-const host =
-  Platform.OS === "android" ? "http://10.0.2.2:3001" : "http://10.0.0.11:3001";
+import { getNotificacionesByUser } from "../services/api";
 
 export default function NotificationsScreen({ navigation }) {
   const { theme, getText } = useTheme();
@@ -29,21 +27,12 @@ export default function NotificationsScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadNotifications() {
-      setLoading(true);
-      try {
-        const url = `${host}/notificaciones?usuario_id=${usuario.id}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        console.log("Fetched notificationsList:", data);
-        setNotificationsList(data);
-        setLoading(false);
-      } catch (e) {
-        console.warn("Error fetching notifications", e);
-        setLoading(false);
-      }
-    }
-    if (usuario) loadNotifications();
+    if (!usuario) return;
+    setLoading(true);
+    getNotificacionesByUser(usuario.id)
+      .then((res) => setNotificationsList(res.data))
+      .catch((e) => console.warn("Error fetching notifications", e))
+      .finally(() => setLoading(false));
   }, [usuario]);
 
   const handleToggle = (key) => {

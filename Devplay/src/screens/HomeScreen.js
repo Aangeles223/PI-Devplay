@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppCard from "../components/AppCard";
+import { getApps, getAllCategorias, getDescargas } from "../services/api";
 // import staticApps fallback (not needed for HomeScreen now)
 import { useNavigation, useRoute } from "@react-navigation/native";
 
@@ -37,11 +38,6 @@ export default function HomeScreen() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   // Download records state
   const [downloadRecords, setDownloadRecords] = useState([]);
-  // Compute API host
-  const host =
-    Platform.OS === "android"
-      ? "http://10.0.2.2:3001"
-      : "http://10.0.0.11:3001";
 
   const handleSearch = (text) => {
     setSearchText(text);
@@ -73,17 +69,17 @@ export default function HomeScreen() {
   };
   // Fetch download records on mount and when screen is focused
   useEffect(() => {
-    if (!host) return;
-    const fetchDownloads = () => {
-      fetch(`${host}/descargas`)
-        .then((res) => res.json())
-        .then((data) => setDownloadRecords(Array.isArray(data) ? data : []))
+    const updateDownloads = () => {
+      getDescargas()
+        .then((res) =>
+          setDownloadRecords(Array.isArray(res.data) ? res.data : [])
+        )
         .catch(console.error);
     };
-    fetchDownloads();
-    const unsubscribe = navigation.addListener("focus", fetchDownloads);
+    updateDownloads();
+    const unsubscribe = navigation.addListener("focus", updateDownloads);
     return unsubscribe;
-  }, [host, navigation]);
+  }, [navigation]);
 
   // Handle install button press: alert and navigate to Downloads
   const handleInstall = (item) => {
@@ -115,67 +111,38 @@ export default function HomeScreen() {
 
   // Al montar, carga los datos estáticos y desactiva el loading
   useEffect(() => {
-    // 1) Cargamos apps
-    // Cargamos apps desde API
-    fetch(`${host}/apps`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!Array.isArray(data)) {
-          console.error("Error: appsData no es un arreglo:", data);
-          setAppsData([]);
-        } else {
-          setAppsData(data);
-        }
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-
-    // 2) Cargamos categorías y formateamos con validación
-    fetch(`${host}/categorias`)
+    getApps()
       .then((res) => {
-        if (!res.ok) {
-          // Leer el mensaje de error devuelto por el servidor
-          return res.json().then((err) => {
-            console.error(
-              `Error al cargar categorías (servidor): ${err.error || err}`
-            );
-            return [];
-          });
-        }
-        return res.json();
+        const data = Array.isArray(res.data) ? res.data : [];
+        console.log("[HomeScreen] Apps cargadas:", data.length);
+        setAppsData(data);
       })
-      .then((cats) => {
-        if (!Array.isArray(cats)) {
-          console.error("Error: categorías no es un arreglo:", cats);
-          setCategories([]);
-          return;
-        }
-        // Mapear campos de BD a id y name
-        const formatted = cats.map((c) => ({
-          id: c.id_categoria || c.id || c.id_cat,
-          name: c.nombre || c.name || c.nombre_categoria,
-        }));
-        setCategories(formatted);
+      .catch((err) => console.error("Error al cargar apps:", err))
+      .finally(() => setLoading(false));
+    getAllCategorias()
+      .then((res) => {
+        const cats = Array.isArray(res.data)
+          ? res.data.map((c) => ({ id: c.id, name: c.name }))
+          : [];
+        console.log("[HomeScreen] Categorías cargadas:", cats.length);
+        setCategories(cats);
       })
       .catch((err) => {
         console.error("Error al cargar categorías:", err);
         setCategories([]);
       });
-
-    // 3) Cargamos datos de usuario
-    const loadUserData = async () => {
+    // cargar usuario desde AsyncStorage
+    (async () => {
       try {
         const userJson = await AsyncStorage.getItem("userData");
-        const user = userJson != null ? JSON.parse(userJson) : null;
+        const user = userJson ? JSON.parse(userJson) : null;
         setUserData(user);
       } catch (e) {
         console.error("Error al cargar datos de usuario:", e);
       } finally {
         setLoading(false);
       }
-    };
-
-    loadUserData();
+    })();
   }, []);
 
   // renderizador de avatar de usuario
@@ -635,6 +602,23 @@ export default function HomeScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.categoriesList}
+          />
+        </View>
+        {/* Sección: Todos los juegos usando AppCard */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+            {getText("allGames") || "Todos los juegos"}
+          </Text>
+          <FlatList
+            scrollEnabled={false} // evitar nested VirtualizedLists
+            data={appsData}
+            renderItem={({ item }) => (
+              <AppCard app={item} price={item.price || getText("free")} />
+            )}
+            keyExtractor={(item) => item.id.toString()}
+            numColumns={2}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
           />
         </View>
 

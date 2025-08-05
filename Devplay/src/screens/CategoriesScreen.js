@@ -10,6 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { appsData as staticApps } from "../data/appsData"; // for fallback if needed
+import { getApps } from "../services/api";
 
 export default function CategoriesScreen({ route, navigation }) {
   const { theme, getText } = useTheme();
@@ -35,17 +36,15 @@ export default function CategoriesScreen({ route, navigation }) {
   };
 
   useEffect(() => {
-    fetch("http://10.0.0.11:3001/apps")
-      .then((res) => res.json())
-      .then((data) => {
-        setAppsData(data);
-        setLoading(false);
+    getApps()
+      .then((res) => {
+        setAppsData(res.data);
       })
       .catch((err) => {
         console.error("Error al cargar apps:", err);
         setAppsData(staticApps);
-        setLoading(false);
-      });
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   // Determine games to display: specific list or by categoryId
