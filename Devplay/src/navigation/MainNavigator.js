@@ -1,4 +1,5 @@
 import React from "react";
+import { useTheme } from "../context/ThemeContext";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createStackNavigator } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -64,27 +65,37 @@ function ProfileStack({ onLogout }) {
 }
 
 export default function MainNavigator({ initialRoute = "Home", onLogout }) {
+  const { getText } = useTheme();
   return (
     <Tab.Navigator
       initialRouteName={initialRoute}
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
+      screenOptions={({ route }) => {
+        // Spanish labels for tabs
+        let label = route.name;
+        if (route.name === "Home") label = getText("home") || "Inicio";
+        else if (route.name === "Search") label = getText("search") || "Buscar";
+        else if (route.name === "Profile")
+          label = getText("profile") || "Perfil";
+        return {
+          tabBarLabel: label,
+          tabBarIcon: ({ focused, color, size }) => {
+            let iconName;
 
-          if (route.name === "Home") {
-            iconName = focused ? "home" : "home-outline";
-          } else if (route.name === "Search") {
-            iconName = focused ? "search" : "search-outline";
-          } else if (route.name === "Profile") {
-            iconName = focused ? "person" : "person-outline";
-          }
+            if (route.name === "Home") {
+              iconName = focused ? "home" : "home-outline";
+            } else if (route.name === "Search") {
+              iconName = focused ? "search" : "search-outline";
+            } else if (route.name === "Profile") {
+              iconName = focused ? "person" : "person-outline";
+            }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: "#007AFF",
-        tabBarInactiveTintColor: "gray",
-        headerShown: false, // Esta línea quita todos los headers azules
-      })}
+            return <Ionicons name={iconName} size={size} color={color} />;
+          },
+          tabBarActiveTintColor: "#007AFF",
+          tabBarInactiveTintColor: "gray",
+          headerShown: false, // quita headers
+        };
+      }}
     >
       <Tab.Screen
         name="Home"

@@ -1,0 +1,26 @@
+{
+  "cli": {
+    "version": ">= 16.17.4",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "production": {
+      "android": { "gradleCommand": ":app:assembleRelease" },
+      "ios": {
+        "scheme": "Devpaly",
+        "buildConfiguration": "Release"
+      }
+    },
+    "internal": {
+      "distribution": "internal",
+      "android": { "gradleCommand": ":app:assembleRelease" },
+      "ios": {
+        "scheme": "Devpaly",
+        "buildConfiguration": "Release"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

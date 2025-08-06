@@ -10,6 +10,7 @@ import {
   Modal,
   Linking,
   TextInput,
+  Alert,
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,19 +18,23 @@ import { useTheme } from "../context/ThemeContext";
 import Constants from "expo-constants";
 import { useContext } from "react";
 import { UserContext } from "../context/UserContext";
+import { postMisApp } from "../services/api";
 import { appsData } from "../data/appsData";
+import {
+  getAppReviews,
+  postReview,
+  getApps,
+  getAllSecciones,
+  getAppsDeSeccion,
+  getDescargas,
+} from "../services/api";
 
 const { width } = Dimensions.get("window");
 
 export default function AppDetailsScreen({ navigation, route }) {
   const { theme, getText, language, getGameText } = useTheme();
   const { usuario: user } = useContext(UserContext);
-  // Host for API: derive LAN IP of dev machine via debuggerHost
-  // Host for API: emulator vs development machine on LAN
-  const host =
-    Platform.OS === "android"
-      ? "http://10.0.2.2:3001"
-      : "http://10.0.0.11:3001"; // Reemplaza con la IP de tu PC en la LAN
+  // Note: using axios-based services for API calls
   const { app } = route.params || {};
 
   // Compute header image source (backend icon or static image)
@@ -67,6 +72,8 @@ export default function AppDetailsScreen({ navigation, route }) {
   const [backendApps, setBackendApps] = useState([]);
   // Track download record with instalada flag
   const [downloadRecord, setDownloadRecord] = useState(null);
+  // Estado para simular descarga
+  const [downloading, setDownloading] = useState(false);
 
   // Reset screenshot modal when switching apps
   useEffect(() => {
@@ -75,69 +82,58 @@ export default function AppDetailsScreen({ navigation, route }) {
   }, [app.id]);
   // Fetch all apps from backend for section rendering
   useEffect(() => {
-    if (!host) return;
-    fetch(`${host}/apps`)
-      .then((res) => res.json())
-      .then((data) => setBackendApps(data))
+    getApps()
+      .then((res) => setBackendApps(Array.isArray(res.data) ? res.data : []))
       .catch(console.error);
-  }, [host]);
+  }, []);
 
   // Fetch reviews from backend
   useEffect(() => {
-    if (!host) return;
-    fetch(`${host}/apps/${app.id}/reviews`)
-      .then((res) => res.json())
-      .then((data) => setReviews(data))
+    // Usar servicio de API para obtener reseñas
+    getAppReviews(app.id)
+      .then((res) => setReviews(Array.isArray(res.data) ? res.data : []))
       .catch(console.error);
-  }, [host, app.id]);
+  }, [app.id]);
 
   // Fetch sections and their apps
   useEffect(() => {
-    if (!host) return;
-    fetch(`${host}/secciones`)
-      .then((res) => res.json())
-      .then((sects) => {
+    getAllSecciones()
+      .then((res) => {
+        const sects = Array.isArray(res.data) ? res.data : [];
         setSections(sects);
-        // Fetch apps for all sections and store raw DB entries
-        Promise.all(
+        return Promise.all(
           sects.map((sec) =>
-            fetch(`${host}/secciones/${sec.id}/apps`).then((r) => r.json())
+            getAppsDeSeccion(sec.id).then((r) =>
+              Array.isArray(r.data) ? r.data : []
+            )
           )
-        )
-          .then((allAppsLists) => {
-            const mapped = {};
-            sects.forEach((sec, idx) => {
-              mapped[sec.id] = Array.isArray(allAppsLists[idx])
-                ? allAppsLists[idx]
-                : [];
-            });
-            setSectionApps(mapped);
-          })
-          .catch(console.error);
+        ).then((lists) => ({ sects, lists }));
+      })
+      .then(({ sects, lists }) => {
+        const mapped = {};
+        sects.forEach((sec, idx) => {
+          mapped[sec.id] = lists[idx];
+        });
+        setSectionApps(mapped);
       })
       .catch(console.error);
-  }, [host]);
+  }, []);
 
-  // On mount, check download status
-  // Load download record (instalada flag) on mount
-  const fetchDownloadRecord = () => {
-    if (!host) return;
-    fetch(`${host}/descargas`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          const rec = data.find((d) => d.id_app === app.id) || null;
-          setDownloadRecord(rec);
-        }
-      })
-      .catch(console.error);
-  };
-  useEffect(fetchDownloadRecord, [host, app.id]);
-  // Re-fetch when returning to this screen
+  // Load download record (instalada flag) on mount and on focus
   useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", fetchDownloadRecord);
-    return unsubscribe;
-  }, [navigation, host, app.id]);
+    const loadRecord = () => {
+      getDescargas()
+        .then((res) => {
+          const list = Array.isArray(res.data) ? res.data : [];
+          const rec = list.find((d) => d.id_app === app.id) || null;
+          setDownloadRecord(rec);
+        })
+        .catch(console.error);
+    };
+    loadRecord();
+    const unsub = navigation.addListener("focus", loadRecord);
+    return unsub;
+  }, [navigation, app.id]);
 
   if (!app) return <Text>Error: App no encontrada</Text>;
 
@@ -164,26 +160,22 @@ export default function AppDetailsScreen({ navigation, route }) {
       );
       return;
     }
-    fetch(`${host}/apps/${app.id}/reviews`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        usuario_id: user.id,
-        puntuacion: newRating,
-        comentario: newComment,
-      }),
+    // Usar servicio de API para enviar reseña
+    postReview(app.id, {
+      usuario_id: user.id,
+      puntuacion: newRating,
+      comentario: newComment,
     })
-      .then((res) => res.json())
       .then((res) => {
-        if (res.success) {
-          // Refresh reviews
-          fetch(`${host}/apps/${app.id}/reviews`)
-            .then((r) => r.json())
-            .then((data) => setReviews(data))
-            .catch(console.error);
-          setNewRating(0);
-          setNewComment("");
+        if (res.data.success) {
+          // Refrescar reseñas
+          return getAppReviews(app.id);
         }
+      })
+      .then((res2) => {
+        if (res2) setReviews(Array.isArray(res2.data) ? res2.data : []);
+        setNewRating(0);
+        setNewComment("");
       })
       .catch(console.error);
   };
@@ -195,21 +187,36 @@ export default function AppDetailsScreen({ navigation, route }) {
 
   // Simulate download: register download in backend after progress
   const handleDownload = () => {
-    // Show immediate download alert and navigate to Downloads screen under Profile tab
-    alert(getText("downloading") || `Descargando ${app.name}`);
-    // Navigate to Profile tab's Downloads screen
-    const parentNav = navigation.getParent();
-    if (parentNav) {
-      parentNav.navigate("Profile", {
-        screen: "Downloads",
-        params: { installApp: app },
-      });
-    } else {
-      navigation.navigate("Profile", {
-        screen: "Downloads",
-        params: { installApp: app },
-      });
+    if (!user?.id) {
+      Alert.alert(getText("error") || "Usuario no autenticado");
+      return;
     }
+    setDownloading(true);
+    Alert.alert(getText("installing") || `Instalando ${app.name}`);
+    setTimeout(() => {
+      postMisApp({ app_id_app: app.id, usuario_id: user.id })
+        .then(() => {
+          setDownloading(false);
+          Alert.alert(getText("acquired") || "Juego adquirido");
+          const parentNav = navigation.getParent();
+          if (parentNav) {
+            parentNav.navigate("Profile", {
+              screen: "Downloads",
+              params: { installApp: app },
+            });
+          } else {
+            navigation.navigate("Profile", {
+              screen: "Downloads",
+              params: { installApp: app },
+            });
+          }
+        })
+        .catch((err) => {
+          setDownloading(false);
+          console.error("Error al registrar descarga:", err);
+          Alert.alert(getText("error") || "Error al instalar");
+        });
+    }, 2000);
   };
 
   // Calcular rating a mostrar: usar rating de la API o promedio de reseñas simuladas
@@ -755,9 +762,14 @@ export default function AppDetailsScreen({ navigation, route }) {
                 : handleDownload
               : handleDownload
           }
+          disabled={
+            downloading || (downloadRecord && downloadRecord.instalada === 1)
+          }
         >
           <Text style={styles.installButtonText}>
-            {downloadRecord
+            {downloading
+              ? getText("downloading") || "Descargando..."
+              : downloadRecord
               ? downloadRecord.instalada === 1
                 ? getText("installed") || "Instalada"
                 : `${getText("downloading") || "Instalando"}...`

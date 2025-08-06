@@ -1,54 +1,77 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   FlatList,
-  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
-import { getApps, getDescargas } from "../services/api";
+import { UserContext } from "../context/UserContext";
+import { getMisApps } from "../services/api";
 
 export default function PurchasesScreen({ navigation }) {
   const { theme, getText } = useTheme();
   const [activeFilter, setActiveFilter] = useState("all");
-  const [apps, setApps] = useState([]);
-  const [downloads, setDownloads] = useState([]);
-  const host =
-    Platform.OS === "android"
-      ? "http://10.0.2.2:3001"
-      : "http://10.0.0.11:3001";
+  const [ownedApps, setOwnedApps] = useState([]);
+  const { usuario } = useContext(UserContext);
+  // Fetch owned apps when user is set
   useEffect(() => {
-    getApps()
-      .then((res) => setApps(res.data))
-      .catch(console.error);
-    getDescargas()
-      .then((res) => setDownloads(res.data))
-      .catch(console.error);
-  }, []);
+    const loadOwnedApps = () => {
+      console.log("PurchasesScreen - User data:", usuario);
+      console.log("PurchasesScreen - User ID:", usuario?.id);
+
+      if (!usuario?.id) {
+        console.log("PurchasesScreen - No user ID found, skipping getMisApps");
+        return;
+      }
+
+      getMisApps(usuario.id)
+        .then((res) => {
+          console.log("PurchasesScreen - getMisApps response:", res.data);
+          // Eliminar duplicados basados en id_app
+          const uniqueApps = res.data.filter(
+            (app, index, self) =>
+              index === self.findIndex((a) => a.id_app === app.id_app)
+          );
+          setOwnedApps(uniqueApps);
+        })
+        .catch((e) => {
+          console.error("PurchasesScreen - Error loading owned apps:", e);
+          console.error("Error details:", e.response?.data || e.message);
+        });
+    };
+
+    loadOwnedApps();
+
+    // Recargar cuando regresemos a esta pantalla (si navigation existe)
+    const unsubscribe = navigation?.addListener?.("focus", loadOwnedApps);
+    return () => unsubscribe?.();
+  }, [usuario, navigation]);
   // Combine downloads with app info
-  const purchases = downloads.map((d) => {
-    const app = apps.find((a) => a.id === d.id_app) || {};
-    const priceNum = parseFloat(app.price) || 0;
+  // Map ownedApps to purchase items
+  const purchases = ownedApps.map((appItem) => {
+    const priceNum = parseFloat(appItem.price) || 0;
     const type = priceNum > 0 ? "paid" : "free";
     return {
-      id: d.id_descarga.toString(),
-      name: app.name,
-      category: app.category,
+      id: appItem.id_app.toString(),
+      name: appItem.name,
+      category: appItem.category || "",
       price:
         type === "paid"
           ? `$${priceNum.toFixed(2)}`
           : getText("free") || "Gratis",
-      purchaseDate: new Date(d.fecha).toLocaleDateString(),
+      purchaseDate: "", // fecha not stored in mis_apps
       type,
-      icon: "download-outline",
+      icon: appItem.icon || "", // use icon from API
       status: "owned",
       orderNumber: "",
     };
   });
+
+  console.log("PurchasesScreen - Mapped purchases:", purchases.length, "items");
+  console.log("PurchasesScreen - First few purchases:", purchases.slice(0, 3));
 
   const filters = [
     { id: "all", title: getText("all"), count: purchases.length },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Platform } from "react-native";
 import {
   View,
@@ -10,24 +10,41 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  SafeAreaView,
+  StatusBar,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
+// import Section from "../components/Section";  // removed to restore original design
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppCard from "../components/AppCard";
-import { getApps, getAllCategorias, getDescargas } from "../services/api";
+import {
+  getApps,
+  getAllCategorias,
+  getMisApps,
+  postMisApp,
+  postDescarga,
+} from "../services/api";
 // import staticApps fallback (not needed for HomeScreen now)
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { useAuth } from "../context/AuthContext";
+import { UserContext } from "../context/UserContext";
 
 export default function HomeScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { theme, getText } = useTheme();
 
+  // Contextos de usuario
+  const { user: authUser } = useAuth();
+  const { usuario: contextUser } = useContext(UserContext);
+  const user = authUser || contextUser;
+
   const [appsData, setAppsData] = useState([]);
   const [categories, setCategories] = useState([]);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [installedApps, setInstalledApps] = useState([]);
 
   // añade este estado:
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -38,6 +55,8 @@ export default function HomeScreen() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   // Download records state
   const [downloadRecords, setDownloadRecords] = useState([]);
+  // Estado para simular descarga
+  const [downloadingId, setDownloadingId] = useState(null);
 
   const handleSearch = (text) => {
     setSearchText(text);
@@ -70,43 +89,109 @@ export default function HomeScreen() {
   // Fetch download records on mount and when screen is focused
   useEffect(() => {
     const updateDownloads = () => {
-      getDescargas()
-        .then((res) =>
-          setDownloadRecords(Array.isArray(res.data) ? res.data : [])
-        )
+      if (!userData) return;
+      getMisApps(userData.id)
+        .then((res) => {
+          const records = Array.isArray(res.data) ? res.data : [];
+          setDownloadRecords(records);
+        })
         .catch(console.error);
     };
     updateDownloads();
     const unsubscribe = navigation.addListener("focus", updateDownloads);
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, userData]);
+
+  // Clear and reload download records on user change
+  useEffect(() => {
+    if (userData) {
+      setDownloadRecords([]);
+      getMisApps(userData.id)
+        .then((res) => {
+          const records = Array.isArray(res.data) ? res.data : [];
+          setDownloadRecords(records);
+        })
+        .catch(console.error);
+    }
+  }, [userData]);
+
+  // Cargar apps instaladas del usuario
+  useEffect(() => {
+    const loadInstalledApps = () => {
+      const userId = user?.id || user?.id_usuario || user?.usuario_id;
+      console.log("HomeScreen - User data:", user);
+      console.log("HomeScreen - Extracted userId:", userId);
+
+      if (!userId) {
+        console.log("HomeScreen - No user ID found, skipping getMisApps");
+        return;
+      }
+
+      getMisApps(userId)
+        .then((res) => {
+          console.log("HomeScreen - getMisApps response:", res.data);
+          // Extraer solo los IDs de las apps instaladas
+          const installedIds = res.data.map((app) => app.id_app);
+          setInstalledApps(installedIds);
+        })
+        .catch((e) => {
+          console.error("Error loading installed apps:", e);
+          console.error("Error details:", e.response?.data || e.message);
+        });
+    };
+
+    loadInstalledApps();
+
+    // Recargar cuando regresemos a esta pantalla
+    const unsubscribe = navigation.addListener("focus", loadInstalledApps);
+    return unsubscribe;
+  }, [user, navigation]);
+
+  // Verificar si una app está instalada
+  const isAppInstalled = (appId) => {
+    return installedApps.includes(appId);
+  };
 
   // Handle install button press: alert and navigate to Downloads
   const handleInstall = (item) => {
-    alert(getText("downloading") || `Descargando ${item.name}`);
-    const parentNav = navigation.getParent();
-    if (parentNav) {
-      parentNav.navigate("Profile", {
-        screen: "Downloads",
-        params: { installApp: item },
-      });
-    } else {
-      navigation.navigate("Profile", {
-        screen: "Downloads",
-        params: { installApp: item },
-      });
+    console.log("Botón instalación presionado para:", item.name);
+    console.log("Usuario completo:", user);
+    console.log("App ID:", item.id);
+
+    // Verificar diferentes campos de ID del usuario
+    const userId = user?.id || user?.id_usuario || user?.usuario_id;
+
+    if (!userId) {
+      console.log("No se encontró ID de usuario válido");
+      return Alert.alert("Error", "Usuario no autenticado");
     }
+
+    // Mostrar alerta de confirmación primero
+    Alert.alert("Instalar", `¿Deseas instalar ${item.name}?`, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Instalar",
+        onPress: () => {
+          postDescarga({ id_app: item.id, usuario_id: userId })
+            .then(() => {
+              Alert.alert("Éxito", "Juego instalado correctamente");
+              // Actualizar lista de apps instaladas
+              setInstalledApps((prev) => [...prev, item.id]);
+            })
+            .catch((err) => {
+              console.error("Error al registrar descarga:", err);
+              Alert.alert("Error", "Error al instalar el juego");
+            });
+        },
+      },
+    ]);
   };
 
   // Determine install button label based on download record
   const getInstallLabel = (item) => {
-    const rec = downloadRecords.find((d) => d.id_app === item.id);
-    if (rec) {
-      return rec.instalada === 1
-        ? getText("installed") || "Instalada"
-        : `${getText("downloading") || "Instalando"}...`;
-    }
-    return getText("install") || "Instalar";
+    return isAppInstalled(item.id)
+      ? "Instalado"
+      : getText("install") || "Instalar";
   };
 
   // Al montar, carga los datos estáticos y desactiva el loading
@@ -175,7 +260,16 @@ export default function HomeScreen() {
           <Text style={styles.trendingTitle}>{item.name}</Text>
           <Text style={styles.trendingDeveloper}>{item.developer}</Text>
           <TouchableOpacity
-            style={styles.installButtonSmall}
+            // Disable when already installed
+            disabled={isAppInstalled(item.id)}
+            style={[
+              styles.installButtonSmall,
+              {
+                backgroundColor: isAppInstalled(item.id)
+                  ? theme.secondaryTextColor
+                  : theme.primary,
+              },
+            ]}
             onPress={() => handleInstall(item)}
           >
             <Text style={styles.installButtonTextSmall}>
@@ -216,7 +310,12 @@ export default function HomeScreen() {
         onPress={() => navigation.navigate("AppDetails", { app: item })}
       >
         <Image source={imageSource} style={styles.cardImage} />
-        <View style={[styles.cardContent, { paddingHorizontal: 4 }]}>
+        <View
+          style={[
+            styles.cardContent,
+            { backgroundColor: theme.cardBackground, paddingHorizontal: 4 },
+          ]}
+        >
           <Text
             style={[styles.cardTitle, { color: theme.textColor }]}
             numberOfLines={1}
@@ -279,12 +378,17 @@ export default function HomeScreen() {
             {/* Mostrar precio fijo */}
             <Text style={styles.salePrice}>{formattedPrice}</Text>
             <TouchableOpacity
+              // Deshabilitar si ya instalado
+              disabled={isAppInstalled(item.id)}
               style={[
                 styles.installButton,
                 {
                   marginLeft: "auto",
                   paddingVertical: 6,
                   paddingHorizontal: 12,
+                  backgroundColor: isAppInstalled(item.id)
+                    ? theme.secondaryTextColor
+                    : theme.primary,
                 },
               ]}
               onPress={() => handleInstall(item)}
@@ -327,7 +431,16 @@ export default function HomeScreen() {
         </Text>
       </View>
       <TouchableOpacity
-        style={styles.miniInstallButton}
+        // Deshabilitar si ya instalado
+        disabled={isAppInstalled(app.id)}
+        style={[
+          styles.miniInstallButton,
+          {
+            backgroundColor: isAppInstalled(app.id)
+              ? theme.secondaryTextColor
+              : theme.primary,
+          },
+        ]}
         onPress={() => handleInstall(app)}
       >
         <Text style={styles.miniInstallButtonText}>{getInstallLabel(app)}</Text>
@@ -343,13 +456,8 @@ export default function HomeScreen() {
     );
   }
 
-  // Fallback dinámico de categorías si BD no respondió
-  const categoryList =
-    categories.length > 0
-      ? categories
-      : Array.from(new Set(appsData.map((app) => app.category)))
-          .filter((c) => c)
-          .map((name) => ({ id: name, name }));
+  // Lista de categorías desde la BD
+  const categoryList = categories;
   // Icons and colors per category
   const categoryIconMap = {
     Acción: "flash",
@@ -449,418 +557,336 @@ export default function HomeScreen() {
   // Eliminamos fallback, usamos solo categorías de la BD
 
   return (
-    <View
+    <SafeAreaView
       style={[styles.container, { backgroundColor: theme.backgroundColor }]}
     >
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View
-          style={[styles.header, { backgroundColor: theme.cardBackground }]}
-        >
-          <View style={styles.profileSection}>
-            {/* Avatar y nombre de usuario */}
-            {renderUserAvatar()}
-            <View style={styles.coinsSection}>
-              <Ionicons name="trophy" size={16} color="#FF6B6B" />
-              <Text style={styles.coinsText}>10,000</Text>
-            </View>
+      <StatusBar
+        translucent={false}
+        backgroundColor={theme.cardBackground}
+        barStyle={
+          theme.userInterfaceStyle === "dark" ? "light-content" : "dark-content"
+        }
+      />
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: theme.cardBackground }]}>
+        <View style={styles.profileSection}>
+          {/* Avatar y nombre de usuario */}
+          {renderUserAvatar()}
+          <View style={styles.coinsSection}>
+            <Ionicons name="trophy" size={16} color="#FF6B6B" />
+            <Text style={styles.coinsText}>10,000</Text>
           </View>
-          {/* Search Bar Mejorada */}
-          <View style={styles.searchSection}>
+        </View>
+        {/* Search Bar Mejorada */}
+        <View style={styles.searchSection}>
+          <View
+            style={[
+              styles.searchContainer,
+              {
+                backgroundColor: theme.backgroundColor,
+                borderColor: isSearchFocused ? theme.primary : "transparent",
+                borderWidth: isSearchFocused ? 1 : 0,
+              },
+            ]}
+          >
+            <TouchableOpacity onPress={goToSearch}>
+              <Ionicons
+                name="search"
+                size={20}
+                color={theme.secondaryTextColor}
+                style={styles.searchIcon}
+              />
+            </TouchableOpacity>
+            <TextInput
+              style={[styles.searchInput, { color: theme.textColor }]}
+              placeholder={getText("searchPlaceholder") || "Buscar juegos..."}
+              placeholderTextColor={theme.secondaryTextColor}
+              value={searchText}
+              onChangeText={(text) => {
+                handleSearch(text);
+                setShowSearchResults(true);
+              }}
+              onFocus={handleSearchFocus}
+              onBlur={handleSearchBlur}
+              returnKeyType="search"
+              onSubmitEditing={goToSearch}
+              autoFocus={true}
+            />
+            {searchText.length > 0 && (
+              <TouchableOpacity onPress={clearSearch}>
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color={theme.secondaryTextColor}
+                />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={goToSearch}
+              style={styles.advancedSearchButton}
+            >
+              <Ionicons
+                name="options"
+                size={16}
+                color={theme.secondaryTextColor}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      {/* Home Search Results */}
+      {showSearchResults && searchText.trim() !== "" ? (
+        <FlatList
+          data={searchResults}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <AppCard
+              app={item}
+              price={item.price || getText("free") || ""}
+              onPress={() => navigation.navigate("AppDetails", { app: item })}
+              onInstall={() => handleInstall(item)}
+              installLabel={getInstallLabel(item)}
+              installDisabled={
+                !!downloadRecords.find(
+                  (d) => d.id_app === item.id && d.usuario_id === userData?.id
+                )
+              }
+            />
+          )}
+        />
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Sección de categorías */}
+          {categoryList.length > 0 && (
             <View
               style={[
-                styles.searchContainer,
+                styles.section,
                 {
-                  backgroundColor: theme.backgroundColor,
-                  borderColor: isSearchFocused ? theme.primary : "transparent",
-                  borderWidth: isSearchFocused ? 1 : 0,
+                  backgroundColor: theme.cardBackground,
+                  borderRadius: 8,
+                  marginHorizontal: 16,
+                  paddingVertical: 16,
                 },
               ]}
             >
-              <TouchableOpacity onPress={goToSearch}>
-                <Ionicons
-                  name="search"
-                  size={20}
-                  color={theme.secondaryTextColor}
-                  style={styles.searchIcon}
-                />
-              </TouchableOpacity>
-              <TextInput
-                style={[styles.searchInput, { color: theme.textColor }]}
-                placeholder={getText("searchPlaceholder") || "Buscar juegos..."}
-                placeholderTextColor={theme.secondaryTextColor}
-                value={searchText}
-                onChangeText={handleSearch}
-                onFocus={handleSearchFocus}
-                onBlur={handleSearchBlur}
-                returnKeyType="search"
-                onSubmitEditing={() => {
-                  if (searchText.trim().length > 0) {
-                    goToSearch();
-                  }
-                }}
-              />
-              {searchText.length > 0 && (
-                <TouchableOpacity onPress={clearSearch}>
-                  <Ionicons
-                    name="close-circle"
-                    size={20}
-                    color={theme.secondaryTextColor}
-                  />
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                onPress={goToSearch}
-                style={styles.advancedSearchButton}
-              >
-                <Ionicons
-                  name="options"
-                  size={16}
-                  color={theme.secondaryTextColor}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Resultados de búsqueda en dropdown */}
-            {showSearchResults && searchResults.length > 0 && (
-              <View
-                style={[
-                  styles.searchResults,
-                  {
-                    backgroundColor: theme.cardBackground,
-                    shadowColor: theme.textColor,
-                  },
-                ]}
-              >
-                {searchResults.map(renderSearchResult)}
-                {searchResults.length === 5 && (
-                  <TouchableOpacity
-                    style={[
-                      styles.seeAllResults,
-                      { borderTopColor: theme.border },
-                    ]}
-                    onPress={goToSearch}
-                  >
-                    <Text style={[styles.seeAllText, { color: theme.primary }]}>
-                      {getText("seeMore") || "Ver todos los resultados"}
-                    </Text>
-                    <Ionicons
-                      name="arrow-forward"
-                      size={16}
-                      color={theme.primary}
-                    />
-                  </TouchableOpacity>
-                )}
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+                  {getText("categories") || "Categorías"}
+                </Text>
               </View>
-            )}
-
-            {/* Mensaje de sin resultados */}
-            {showSearchResults &&
-              searchResults.length === 0 &&
-              searchText.length > 0 && (
-                <View
-                  style={[
-                    styles.noResultsDropdown,
-                    { backgroundColor: theme.cardBackground },
-                  ]}
+              <FlatList
+                data={categoryList}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={renderCategory}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoriesList}
+              />
+            </View>
+          )}
+          {/* Sección de juegos en tendencia */}
+          {trendingGames.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+                  {getText("trendingGames") || "Juegos en tendencia"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    handleSeeMorePress(
+                      getText("trendingGames") || "Juegos en tendencia",
+                      trendingGames
+                    )
+                  }
                 >
-                  <Text
-                    style={[
-                      styles.noResultsText,
-                      { color: theme.secondaryTextColor },
-                    ]}
-                  >
-                    {getText("noResultsDesc") || "No se encontraron juegos"}
+                  <Text style={[styles.seeMore, { color: theme.primary }]}>
+                    {getText("seeMore") || "Ver más"}
                   </Text>
-                  <TouchableOpacity
-                    style={styles.searchAllButton}
-                    onPress={goToSearch}
-                  >
-                    <Text
-                      style={[
-                        styles.searchAllButtonText,
-                        { color: theme.primary },
-                      ]}
-                    >
-                      Buscar en toda la tienda
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-          </View>
-        </View>
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={trendingGames}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={renderTrendingGame}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.trendingList}
+              />
+            </View>
+          )}
 
-        {/* Categories */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-            {getText("categories")}
-          </Text>
-          <FlatList
-            data={categoryList}
-            renderItem={renderCategory}
-            keyExtractor={(cat) => cat.id.toString()}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-          />
-        </View>
-        {/* Sección: Todos los juegos usando AppCard */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-            {getText("allGames") || "Todos los juegos"}
-          </Text>
-          <FlatList
-            scrollEnabled={false} // evitar nested VirtualizedLists
-            data={appsData}
-            renderItem={({ item }) => (
-              <AppCard app={item} price={item.price || getText("free")} />
-            )}
-            keyExtractor={(item) => item.id.toString()}
-            numColumns={2}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
-          />
-        </View>
+          {/* Sección de nuevas entregas (releases) */}
+          {newReleases.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+                  {getText("newReleases") || "Nuevas entregas"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    handleSeeMorePress("Nuevas entregas", newReleases)
+                  }
+                >
+                  <Text style={[styles.seeMore, { color: theme.primary }]}>
+                    {getText("seeMore") || "Ver más"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={newReleases}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={renderGameCard}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.releasesList}
+              />
+            </View>
+          )}
 
-        {/* Juegos en tendencia */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-              {getText("trending")}
-            </Text>
-            <TouchableOpacity
-              onPress={() => handleSeeMorePress("Trending", trendingGames)}
-            >
-              <Text
-                style={[
-                  styles.seeMoreText,
-                  { color: theme.secondaryTextColor },
-                ]}
-              >
-                {getText("seeMore")}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={trendingGames}
-            renderItem={renderGameCard}
-            keyExtractor={(item) => item.id.toString()}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.newReleasesList}
-          />
-        </View>
+          {/* Sección de ofertas */}
+          {offersList.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+                  {getText("offers") || "Ofertas"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => handleSeeMorePress("Ofertas", offersList)}
+                >
+                  <Text style={[styles.seeMore, { color: theme.primary }]}>
+                    {getText("seeMore") || "Ver más"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={offersList}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={renderGameCard}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.offersList}
+              />
+            </View>
+          )}
 
-        {/* Nuevos lanzamientos */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-              {getText("newReleases")}
-            </Text>
-            <TouchableOpacity
-              onPress={() => handleSeeMorePress("New Releases", newReleases)}
-            >
-              <Text
-                style={[
-                  styles.seeMoreText,
-                  { color: theme.secondaryTextColor },
-                ]}
-              >
-                {getText("seeMore")}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={newReleases}
-            renderItem={renderGameCard}
-            keyExtractor={(item) => item.id.toString()}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.newReleasesList}
-          />
-        </View>
+          {/* Sección de juegos gratuitos destacados */}
+          {topFreeListSafe.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+                  {getText("topFreeGames") || "Top juegos gratuitos"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    handleSeeMorePress("Top Gratis", topFreeListSafe)
+                  }
+                >
+                  <Text style={[styles.seeMore, { color: theme.primary }]}>
+                    {getText("seeMore") || "Ver más"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={topFreeListSafe}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={renderGameCard}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.topFreeList}
+              />
+            </View>
+          )}
 
-        {/* Ofertas */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-              {getText("offers")}
-            </Text>
-            <TouchableOpacity
-              onPress={() => handleSeeMorePress("Offers", offersList)}
-            >
-              <Text
-                style={[
-                  styles.seeMoreText,
-                  { color: theme.secondaryTextColor },
-                ]}
-              >
-                {getText("seeMore")}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={offersList}
-            renderItem={renderGameCard}
-            keyExtractor={(item) => item.id.toString()}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.newReleasesList}
-          />
-        </View>
+          {/* Sección de juegos de pago destacados */}
+          {topPaidListSafe.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+                  {getText("topPaidGames") || "Top juegos de pago"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    handleSeeMorePress("Top Pago", topPaidListSafe)
+                  }
+                >
+                  <Text style={[styles.seeMore, { color: theme.primary }]}>
+                    {getText("seeMore") || "Ver más"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={topPaidListSafe}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={renderGameCard}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.topPaidList}
+              />
+            </View>
+          )}
 
-        {/* Juegos Gratuitos */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-              {getText("freeGames")}
-            </Text>
-            <TouchableOpacity
-              onPress={() => handleSeeMorePress("Free Games", freeListSafe)}
-            >
-              <Text
-                style={[
-                  styles.seeMoreText,
-                  { color: theme.secondaryTextColor },
-                ]}
-              >
-                {getText("seeMore")}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={freeListSafe}
-            renderItem={renderGameCard}
-            keyExtractor={(item) => item.id.toString()}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.newReleasesList}
-          />
-        </View>
+          {/* Sección de juegos multijugador */}
+          {multiListSafe.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+                  {getText("multiplayerGames") || "Juegos multijugador"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    handleSeeMorePress("Multijugador", multiListSafe)
+                  }
+                >
+                  <Text style={[styles.seeMore, { color: theme.primary }]}>
+                    {getText("seeMore") || "Ver más"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={multiListSafe}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={renderGameCard}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.multiList}
+              />
+            </View>
+          )}
 
-        {/* Top Juegos Gratis */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-              {getText("topFreeGames")}
-            </Text>
-            <TouchableOpacity
-              onPress={() =>
-                handleSeeMorePress("Top Free Games", topFreeListSafe)
-              }
-            >
-              <Text
-                style={[
-                  styles.seeMoreText,
-                  { color: theme.secondaryTextColor },
-                ]}
-              >
-                {getText("seeMore")}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={topFreeListSafe}
-            renderItem={renderGameCard}
-            keyExtractor={(item) => item.id.toString()}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.newReleasesList}
-          />
-        </View>
-
-        {/* Multijugador */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-              {getText("multiplayer")}
-            </Text>
-            <TouchableOpacity
-              onPress={() => handleSeeMorePress("Multiplayer", multiListSafe)}
-            >
-              <Text
-                style={[
-                  styles.seeMoreText,
-                  { color: theme.secondaryTextColor },
-                ]}
-              >
-                {getText("seeMore")}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={multiListSafe}
-            renderItem={renderGameCard}
-            keyExtractor={(item) => item.id.toString()}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.newReleasesList}
-          />
-        </View>
-
-        {/* Top Juegos de Pago */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-              {getText("topPaidGames")}
-            </Text>
-            <TouchableOpacity
-              onPress={() =>
-                handleSeeMorePress("Top Paid Games", topPaidListSafe)
-              }
-            >
-              <Text
-                style={[
-                  styles.seeMoreText,
-                  { color: theme.secondaryTextColor },
-                ]}
-              >
-                {getText("seeMore")}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={topPaidListSafe}
-            renderItem={renderGameCard}
-            keyExtractor={(item) => item.id.toString()}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.newReleasesList}
-          />
-        </View>
-
-        {/* Juegos Sin Conexión */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-              {getText("offlineGames")}
-            </Text>
-            <TouchableOpacity
-              onPress={() =>
-                handleSeeMorePress("Offline Games", offlineListSafe)
-              }
-            >
-              <Text
-                style={[
-                  styles.seeMoreText,
-                  { color: theme.secondaryTextColor },
-                ]}
-              >
-                {getText("seeMore")}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={offlineListSafe}
-            renderItem={renderGameCard}
-            keyExtractor={(item) => item.id.toString()}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.newReleasesList}
-          />
-        </View>
-      </ScrollView>
-    </View>
+          {/* Sección de juegos sin conexión */}
+          {offlineListSafe.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+                  {getText("offlineGames") || "Juegos sin conexión"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    handleSeeMorePress("Sin conexión", offlineListSafe)
+                  }
+                >
+                  <Text style={[styles.seeMore, { color: theme.primary }]}>
+                    {getText("seeMore") || "Ver más"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={offlineListSafe}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={renderGameCard}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.offlineList}
+              />
+            </View>
+          )}
+        </ScrollView>
+      )}
+    </SafeAreaView>
   );
 }
 
@@ -869,111 +895,90 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 15,
+    paddingTop: Platform.OS === "android" ? 25 : 0,
+    paddingBottom: 10,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    elevation: 4,
+    zIndex: 100,
   },
   profileSection: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 15,
   },
   profilePic: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#333",
-    justifyContent: "center",
-    alignItems: "center",
-    overflow: "hidden",
-  },
-  profileText: {
-    color: "white",
-    fontWeight: "600",
-    fontSize: 16,
+    marginRight: 12,
   },
   coinsSection: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFF8F0",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
   },
   coinsText: {
-    marginLeft: 6,
     color: "#FF6B6B",
-    fontWeight: "600",
-    fontSize: 14,
+    fontWeight: "bold",
+    marginLeft: 4,
   },
   searchSection: {
-    position: "relative",
-    zIndex: 1000,
+    flex: 1,
+    marginLeft: 8,
+    marginRight: 8,
   },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 25,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    marginTop: 10,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
+    padding: 0,
+    margin: 0,
   },
   advancedSearchButton: {
     marginLeft: 8,
-    padding: 8, // <— concreta un valor para 'padding'
   },
   section: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 10,
+    marginTop: 16,
+    marginBottom: 24,
+    paddingHorizontal: 16,
   },
   sectionHeader: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  categoriesList: {
-    paddingRight: 20,
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
   },
-  trendingList: {
-    paddingLeft: 20,
-    paddingBottom: 10,
-  },
-  categoryChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 15,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginRight: 10,
-  },
-  categoryText: {
+  seeMore: {
+    fontSize: 14,
     fontWeight: "500",
   },
+  trendingList: {
+    paddingVertical: 8,
+  },
   trendingCard: {
-    width: 140,
-    borderRadius: 12,
-    marginRight: 16,
-    marginVertical: 8,
+    width: 120,
+    marginRight: 12,
+    borderRadius: 8,
     overflow: "hidden",
-    elevation: 4,
+    position: "relative",
   },
   trendingImage: {
     width: "100%",
-    height: 100,
+    height: 180,
     resizeMode: "cover",
   },
   trendingOverlay: {
@@ -983,299 +988,188 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     justifyContent: "flex-end",
-    padding: 10,
+    padding: 8,
   },
   ratingBadge: {
     position: "absolute",
-    top: 10,
-    right: 10,
-    backgroundColor: "#000",
-    borderRadius: 10,
-    paddingVertical: 4,
+    top: 8,
+    right: 8,
+    backgroundColor: "#FF6B6B",
+    borderRadius: 12,
     paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   ratingText: {
     color: "#fff",
-    fontWeight: "500",
-    fontSize: 12,
+    fontWeight: "bold",
   },
   trendingInfo: {
-    backgroundColor: "#000",
-    borderRadius: 10,
-    padding: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 8,
+    padding: 8,
   },
   trendingTitle: {
     color: "#fff",
-    fontWeight: "600",
-    fontSize: 14,
+    fontWeight: "bold",
+    fontSize: 16,
     marginBottom: 4,
   },
   trendingDeveloper: {
-    color: "#ccc",
-    fontSize: 12,
+    color: "#fff",
+    fontSize: 14,
     marginBottom: 8,
   },
   installButtonSmall: {
     backgroundColor: "#FF6B6B",
-    borderRadius: 15,
-    paddingVertical: 6,
+    borderRadius: 16,
+    paddingVertical: 4,
     paddingHorizontal: 12,
   },
   installButtonTextSmall: {
     color: "#fff",
-    fontWeight: "500",
-    fontSize: 12,
-  },
-  gameCard: {
-    width: 120,
-    borderRadius: 10,
-    marginRight: 15,
-    overflow: "hidden",
-    elevation: 2,
-  },
-  gameImage: {
-    width: "100%",
-    height: 80,
-    resizeMode: "cover",
-  },
-  gameOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: "flex-end",
-    padding: 10,
-  },
-  gameTitle: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  gameDeveloper: {
-    color: "#ccc",
-    fontSize: 12,
-    marginBottom: 8,
-  },
-  gameInfo: {
-    backgroundColor: "rgba(0,0,0,0.6)",
-    borderRadius: 10,
-    padding: 10,
-  },
-  priceContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  originalPrice: {
-    color: "#fff",
-    textDecorationLine: "line-through",
-    fontSize: 12,
-    marginRight: 4,
-  },
-  salePrice: {
-    color: "#FF6B6B",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  installButton: {
-    backgroundColor: "#FF6B6B",
-    borderRadius: 15,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-  },
-  installButtonText: {
-    color: "#fff",
-    fontWeight: "500",
-    fontSize: 14,
-  },
-  searchResultItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-  },
-  searchResultIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  searchResultInfo: {
-    flex: 1,
-  },
-  searchResultName: {
-    fontWeight: "500",
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  searchResultDeveloper: {
-    color: "#666",
-    fontSize: 14,
-    marginBottom: 2,
-  },
-  searchResultCategory: {
-    fontSize: 12,
-    borderRadius: 10,
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-  },
-  searchResultActions: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  miniInstallButton: {
-    backgroundColor: "#FF6B6B",
-    borderRadius: 15,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  miniInstallButtonText: {
-    color: "#fff",
-    fontWeight: "500",
-    fontSize: 12,
-  },
-  searchResults: {
-    position: "absolute",
-    top: 60,
-    left: 0,
-    right: 0,
-    zIndex: 999,
-    borderRadius: 10,
-    overflow: "hidden",
-    elevation: 4,
-  },
-  seeAllResults: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderTopWidth: 1,
-    borderTopColor: "#ddd",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  seeAllText: {
-    fontWeight: "500",
-    fontSize: 14,
-  },
-  noResultsDropdown: {
-    position: "absolute",
-    top: 60,
-    left: 0,
-    right: 0,
-    zIndex: 999,
-    borderRadius: 10,
-    overflow: "hidden",
-    elevation: 4,
-    padding: 15,
-  },
-  noResultsText: {
-    color: "#666",
-    fontSize: 14,
-    marginBottom: 10,
-  },
-  searchAllButton: {
-    backgroundColor: "#FF6B6B",
-    borderRadius: 15,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignSelf: "flex-start",
-  },
-  searchAllButtonText: {
-    color: "#fff",
-    fontWeight: "500",
-    fontSize: 14,
-  },
-  appsList: {
-    paddingBottom: 20,
+    fontWeight: "bold",
+    textAlign: "center",
   },
   cardContainer: {
-    width: 140,
-    marginRight: 16,
-    marginVertical: 8,
     borderRadius: 12,
     overflow: "hidden",
-    elevation: 4,
+    marginBottom: 16,
   },
   cardImage: {
     width: "100%",
-    height: 80,
+    height: 150,
+    resizeMode: "cover",
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   cardContent: {
-    padding: 8,
+    backgroundColor: "#fff",
+    padding: 12,
+    borderRadius: 12,
   },
   cardTitle: {
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 4,
   },
   cardSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 14,
+    color: "#777",
+    marginBottom: 8,
   },
-  subInfoText: {
-    fontSize: 12,
-    marginTop: 0,
-  },
-  cardFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  badge: {
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "500",
-  },
-  // Category label badge
   categoryLabel: {
-    alignSelf: "flex-start",
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginTop: 4,
+    backgroundColor: "#FF6B6B",
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginBottom: 8,
   },
   categoryLabelText: {
     color: "#fff",
-    fontSize: 10,
     fontWeight: "500",
+    fontSize: 12,
   },
-  // Rating under category
-  ratingContainer: {
+  subInfoText: {
+    fontSize: 12,
+    color: "#777",
+    marginLeft: 4,
+  },
+  cardFooter: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
+    justifyContent: "space-between",
+    marginTop: 8,
   },
-  newReleasesList: {
-    paddingLeft: 20,
-    paddingBottom: 10,
+  salePrice: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#FF6B6B",
+  },
+  installButton: {
+    backgroundColor: "#FF6B6B",
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  installButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    textAlign: "center",
   },
   loader: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  categoryLabel: {
-    backgroundColor: "#FF6B6B",
-    borderRadius: 10,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    marginTop: 4,
+  scrollContainer: {
+    paddingBottom: 16,
   },
-  categoryLabelText: {
-    color: "#fff",
-    fontWeight: "500",
-    fontSize: 12,
-  },
-  ratingContainer: {
+  searchResultItem: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  searchResultIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  searchResultInfo: {
+    flex: 1,
+  },
+  searchResultName: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  searchResultDeveloper: {
+    fontSize: 14,
+    color: "#777",
+  },
+  miniInstallButton: {
+    backgroundColor: "#FF6B6B",
+    borderRadius: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  miniInstallButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    textAlign: "center",
+    fontSize: 12,
+  },
+  categoryChip: {
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  categoryText: {
+    color: "#fff",
+    fontWeight: "500",
+    fontSize: 14,
+  },
+  offersList: {
+    paddingVertical: 8,
+  },
+  topFreeList: {
+    paddingVertical: 8,
+  },
+  topPaidList: {
+    paddingVertical: 8,
+  },
+  multiList: {
+    paddingVertical: 8,
+  },
+  offlineList: {
+    paddingVertical: 8,
+  },
+  categoriesList: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   Text,
@@ -6,11 +6,14 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { appsData as staticApps } from "../data/appsData"; // for fallback if needed
-import { getApps } from "../services/api";
+import { getApps, postMisApp, postDescarga, getMisApps } from "../services/api";
+import { useAuth } from "../context/AuthContext";
+import { UserContext } from "../context/UserContext";
 
 export default function CategoriesScreen({ route, navigation }) {
   const { theme, getText } = useTheme();
@@ -18,21 +21,109 @@ export default function CategoriesScreen({ route, navigation }) {
   const [appsData, setAppsData] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Install/download handler: simulate download and navigate to Downloads screen
-  const handleInstall = (app) => {
-    alert(getText("installing") || `Instalando ${app.name}`);
-    const parentNav = navigation.getParent();
-    if (parentNav) {
-      parentNav.navigate("Profile", {
-        screen: "Downloads",
-        params: { installApp: app },
-      });
-    } else {
-      navigation.navigate("Profile", {
-        screen: "Downloads",
-        params: { installApp: app },
-      });
+  // Contextos de usuario
+  const { user: authUser } = useAuth();
+  const { usuario: contextUser } = useContext(UserContext);
+  const user = authUser || contextUser;
+
+  // Estado para apps instaladas
+  const [installedApps, setInstalledApps] = useState([]);
+  // Cargar apps instaladas del usuario
+  useEffect(() => {
+    const loadInstalledApps = () => {
+      const userId = user?.id || user?.id_usuario || user?.usuario_id;
+      if (!userId) return;
+
+      getMisApps(userId)
+        .then((res) => {
+          // Extraer solo los IDs de las apps instaladas
+          const installedIds = res.data.map((app) => app.id_app);
+          setInstalledApps(installedIds);
+        })
+        .catch((e) => console.error("Error loading installed apps:", e));
+    };
+
+    loadInstalledApps();
+
+    // Recargar cuando regresemos a esta pantalla
+    const unsubscribe = navigation.addListener("focus", loadInstalledApps);
+    return unsubscribe;
+  }, [user, navigation]);
+
+  // Verificar si una app está instalada
+  const isAppInstalled = (appId) => {
+    return installedApps.includes(appId);
+  };
+
+  // Handle install button press: alert and navigate to Downloads
+  const handleInstall = (item) => {
+    console.log("Botón instalación presionado para:", item.name);
+    console.log("Usuario completo:", user);
+
+    const usuario_id = user?.id || user?.id_usuario || user?.usuario_id;
+
+    if (!usuario_id) {
+      Alert.alert(
+        getText("error") || "Error",
+        getText("userNotAuthenticated") || "Usuario no autenticado"
+      );
+      return;
     }
+
+    if (isAppInstalled(item.id)) {
+      Alert.alert(
+        getText("info") || "Información",
+        getText("appAlreadyInstalled") || "Esta aplicación ya está instalada"
+      );
+      return;
+    }
+
+    Alert.alert(
+      getText("confirm") || "Confirmar",
+      `${getText("installApp") || "¿Instalar"} ${item.name}?`,
+      [
+        {
+          text: getText("cancel") || "Cancelar",
+          style: "cancel",
+        },
+        {
+          text: getText("install") || "Instalar",
+          onPress: async () => {
+            try {
+              console.log("Llamando postDescarga con:", {
+                id_app: item.id,
+                usuario_id,
+              });
+              const response = await postDescarga({
+                id_app: item.id,
+                usuario_id,
+              });
+              console.log("Respuesta de postDescarga:", response.data);
+
+              // Actualizar el estado local para reflejar que la app está instalada
+              setInstalledApps((prev) => [...prev, item.id]);
+
+              Alert.alert(
+                getText("success") || "Éxito",
+                getText("appInstalled") || "Aplicación instalada correctamente"
+              );
+            } catch (error) {
+              console.error("Error al instalar:", error);
+              Alert.alert(
+                getText("error") || "Error",
+                getText("installError") || "Error al instalar la aplicación"
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const getInstallLabel = (item) => {
+    return isAppInstalled(item.id)
+      ? getText("installed") || "Instalado"
+      : getText("install") || "Instalar";
   };
 
   useEffect(() => {
@@ -89,15 +180,18 @@ export default function CategoriesScreen({ route, navigation }) {
           </Text>
         </View>
         <TouchableOpacity
+          disabled={isAppInstalled(item.id)}
           style={[
             styles.installButton,
-            item.isFree ? styles.freeButton : styles.paidButton,
+            {
+              backgroundColor: isAppInstalled(item.id)
+                ? theme.secondaryTextColor
+                : theme.primary,
+            },
           ]}
-          onPress={() => handleInstall(item)} // Attach install handler
+          onPress={() => handleInstall(item)}
         >
-          <Text style={styles.installButtonText}>
-            {item.isFree ? getText("install") : item.price}
-          </Text>
+          <Text style={styles.installButtonText}>{getInstallLabel(item)}</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>

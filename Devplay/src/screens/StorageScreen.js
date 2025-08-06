@@ -252,84 +252,82 @@ export default function StorageScreen({ navigation }) {
             { backgroundColor: theme.cardBackground },
           ]}
         >
-          <View style={styles.overviewHeader}>
-            <Ionicons name="phone-portrait" size={24} color="#8E44AD" />
-            <Text style={[styles.overviewTitle, { color: theme.textColor }]}>
-              {getText("gameStorage")}
+          <Text style={[styles.headerTitle, { color: theme.textColor }]}>
+            {getText("storage")}
+          </Text>
+          <Text style={[styles.overviewTitle, { color: theme.textColor }]}>
+            {getText("gameStorage")}
+          </Text>
+        </View>
+
+        <View
+          style={[
+            styles.storageCircle,
+            { backgroundColor: theme.backgroundColor },
+          ]}
+        >
+          <View style={styles.storageCircleInner}>
+            <Text style={[styles.usedStorage, { color: theme.textColor }]}>
+              {storageData.used} GB
+            </Text>
+            <Text style={[styles.usedLabel, { color: theme.textSecondary }]}>
+              {getText("used")}
             </Text>
           </View>
+        </View>
 
-          <View
-            style={[
-              styles.storageCircle,
-              { backgroundColor: theme.backgroundColor },
-            ]}
-          >
-            <View style={styles.storageCircleInner}>
-              <Text style={[styles.usedStorage, { color: theme.textColor }]}>
-                {storageData.used} GB
-              </Text>
-              <Text style={[styles.usedLabel, { color: theme.textSecondary }]}>
-                {getText("used")}
-              </Text>
-            </View>
+        <View style={styles.storageDetails}>
+          <View style={styles.storageDetailItem}>
+            <Text
+              style={[
+                styles.storageDetailLabel,
+                { color: theme.textSecondary },
+              ]}
+            >
+              {getText("total")}
+            </Text>
+            <Text
+              style={[styles.storageDetailValue, { color: theme.textColor }]}
+            >
+              {" "}
+              {storageData.total} GB
+            </Text>
           </View>
+          <View style={styles.storageDetailItem}>
+            <Text
+              style={[
+                styles.storageDetailLabel,
+                { color: theme.textSecondary },
+              ]}
+            >
+              {getText("available")}
+            </Text>
+            <Text style={[styles.storageDetailValue, styles.availableValue]}>
+              {" "}
+              {storageData.available} GB
+            </Text>
+          </View>
+        </View>
 
-          <View style={styles.storageDetails}>
-            <View style={styles.storageDetailItem}>
-              <Text
-                style={[
-                  styles.storageDetailLabel,
-                  { color: theme.textSecondary },
-                ]}
-              >
-                {" "}
-                {getText("total")}
-              </Text>
-              <Text
-                style={[styles.storageDetailValue, { color: theme.textColor }]}
-              >
-                {" "}
-                {storageData.total} GB
-              </Text>
-            </View>
-            <View style={styles.storageDetailItem}>
-              <Text
-                style={[
-                  styles.storageDetailLabel,
-                  { color: theme.textSecondary },
-                ]}
-              >
-                {" "}
-                {getText("available")}
-              </Text>
-              <Text style={[styles.storageDetailValue, styles.availableValue]}>
-                {" "}
-                {storageData.available} GB
-              </Text>
-            </View>
-          </View>
-
-          {/* Storage Bar */}
-          <View
-            style={[
-              styles.storageBar,
-              { backgroundColor: theme.backgroundColor },
-            ]}
-          >
-            {storageData.categories.map((category, index) => (
-              <View
-                key={category.id}
-                style={[
-                  styles.storageBarSegment,
-                  {
-                    width: `${getPercentage(category.size)}%`,
-                    backgroundColor: category.color,
-                  },
-                ]}
-              />
-            ))}
-          </View>
+        {/* Storage Bar */}
+        <View
+          style={[
+            styles.storageBar,
+            { backgroundColor: theme.backgroundColor },
+          ]}
+        >
+          {storageData.categories.map((category, index) => (
+            <View
+              key={category.id}
+              style={[
+                styles.storageBarSegment,
+                {
+                  width: `${getPercentage(category.size)}%`,
+                  backgroundColor: category.color,
+                },
+              ]}
+            />
+          ))}
         </View>
       </ScrollView>
       {/* Storage Categories */}
@@ -374,72 +372,7 @@ export default function StorageScreen({ navigation }) {
           <Ionicons name="chevron-forward" size={16} color={theme.primary} />
         </TouchableOpacity>
       </View>
-      {/* Storage Tips */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-          {" "}
-          {getText("storageTips")}
-        </Text>
-
-        <View style={[styles.tipItem, { borderBottomColor: theme.border }]}>
-          <Ionicons name="trash-outline" size={24} color="#FF3B30" />
-          <View style={styles.tipContent}>
-            <Text style={[styles.tipTitle, { color: theme.textColor }]}>
-              {getText("tipClearCache")}
-            </Text>
-            <Text
-              style={[styles.tipDescription, { color: theme.textSecondary }]}
-            >
-              {getText("tipClearCacheDesc")}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.tipButton, { backgroundColor: theme.primary }]}
-          >
-            <Text style={styles.tipButtonText}>{getText("actionClean")}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={[styles.tipItem, { borderBottomColor: theme.border }]}>
-          <Ionicons name="cloud-upload-outline" size={24} color="#007AFF" />
-          <View style={styles.tipContent}>
-            <Text style={[styles.tipTitle, { color: theme.textColor }]}>
-              {getText("tipBackupSaves")}
-            </Text>
-            <Text
-              style={[styles.tipDescription, { color: theme.textSecondary }]}
-            >
-              {getText("tipBackupSavesDesc")}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.tipButton, { backgroundColor: theme.primary }]}
-          >
-            <Text style={styles.tipButtonText}>{getText("actionSetup")}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={[styles.tipItem, { borderBottomColor: theme.border }]}>
-          <Ionicons name="download-outline" size={24} color="#34C759" />
-          <View style={styles.tipContent}>
-            <Text style={[styles.tipTitle, { color: theme.textColor }]}>
-              {getText("tipUnusedGames")}
-            </Text>
-            <Text
-              style={[styles.tipDescription, { color: theme.textSecondary }]}
-            >
-              {getText("tipUnusedGamesDesc")}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.tipButton, { backgroundColor: theme.primary }]}
-          >
-            <Text style={styles.tipButtonText}>{getText("actionReview")}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>{" "}
-      // end Storage Tips section
-    </View> // end root View
+    </View>
   );
 }
 

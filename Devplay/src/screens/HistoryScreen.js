@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   View,
   Text,
@@ -18,6 +19,25 @@ export default function HistoryScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchHistory, setSearchHistory] = useState([]);
   const [viewHistory, setViewHistory] = useState([]);
+
+  // Define tabs for the history screen
+  const tabs = React.useMemo(
+    () => [
+      {
+        id: "search",
+        icon: "search-outline",
+        titleKey: "searchHistory",
+        count: searchHistory.length,
+      },
+      {
+        id: "view",
+        icon: "eye-outline",
+        titleKey: "viewHistory",
+        count: viewHistory.length,
+      },
+    ],
+    [searchHistory.length, viewHistory.length]
+  );
 
   // Load persisted history on focus
   useFocusEffect(

@@ -10,6 +10,7 @@ import {
   Alert,
   Image,
   FlatList,
+  Platform,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker"; // <--- import Picker
 import { Ionicons } from "@expo/vector-icons";
@@ -65,11 +66,84 @@ export default function ProfileScreen({ navigation, route, onLogout }) {
   }, []);
 
   const handleInputChange = (field, value) => {
+    // Validación y formateo especial para fecha de nacimiento
+    if (field === "fecha_nacimiento") {
+      // Validar formato de fecha YYYY-MM-DD
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+      if (value && !dateRegex.test(value)) {
+        console.warn("Formato de fecha inválido:", value);
+        // Intentar corregir formato común DD-MM-YYYY o MM-DD-YYYY
+        const parts = value.split(/[-/]/);
+        if (parts.length === 3) {
+          const [part1, part2, part3] = parts;
+
+          // Si el primer elemento tiene 4 dígitos, probablemente ya está en formato correcto
+          if (part1.length === 4) {
+            // Validar que month y day sean válidos
+            const month = parseInt(part2);
+            const day = parseInt(part3);
+
+            if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+              value = `${part1}-${part2.padStart(2, "0")}-${part3.padStart(
+                2,
+                "0"
+              )}`;
+            }
+          }
+          // Si el último elemento tiene 4 dígitos, formato DD-MM-YYYY
+          else if (part3.length === 4) {
+            const day = parseInt(part1);
+            const month = parseInt(part2);
+
+            if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+              value = `${part3}-${part2.padStart(2, "0")}-${part1.padStart(
+                2,
+                "0"
+              )}`;
+            }
+          }
+        }
+      }
+
+      // Validación adicional de fecha válida
+      if (value) {
+        const date = new Date(value);
+        if (isNaN(date.getTime())) {
+          console.warn("Fecha inválida:", value);
+          return; // No actualizar si la fecha es inválida
+        }
+
+        // Validar que la fecha no sea futura (para fecha de nacimiento)
+        if (date > new Date()) {
+          console.warn("Fecha de nacimiento no puede ser futura:", value);
+          return;
+        }
+      }
+    }
+
     setProfileData((prev) => ({ ...prev, [field]: value }));
   };
 
   // 3) Guardar cambios
   const handleSaveProfile = () => {
+    // Validación de fecha antes de enviar
+    if (profileData.fecha_nacimiento) {
+      const date = new Date(profileData.fecha_nacimiento);
+      if (isNaN(date.getTime())) {
+        Alert.alert(
+          "Error",
+          "Formato de fecha inválido. Use el formato YYYY-MM-DD (ej: 2002-07-26)"
+        );
+        return;
+      }
+
+      if (date > new Date()) {
+        Alert.alert("Error", "La fecha de nacimiento no puede ser futura");
+        return;
+      }
+    }
+
     setIsEditing(false);
     const updatedData = {
       nombre: profileData.nombre,
@@ -81,6 +155,8 @@ export default function ProfileScreen({ navigation, route, onLogout }) {
       fecha_nacimiento: profileData.fecha_nacimiento?.slice(0, 10) || null,
     };
 
+    console.log("Enviando datos actualizados:", updatedData);
+
     updateUser(profileData.id, updatedData)
       .then((res) => {
         setProfileData(res.data.usuario);
@@ -89,12 +165,14 @@ export default function ProfileScreen({ navigation, route, onLogout }) {
           getText("changesSaved") || "Los cambios se guardaron con éxito."
         );
       })
-      .catch(() =>
+      .catch((error) => {
+        console.error("Error actualizando perfil:", error);
         Alert.alert(
-          getText("error") || "Error",
-          getText("connectionError") || "No se pudo conectar al servidor."
-        )
-      );
+          "Error",
+          "No se pudo actualizar el perfil. Verifique que todos los datos sean correctos."
+        );
+        setIsEditing(true); // Volver al modo edición si hay error
+      });
   };
 
   const handleEditProfile = () => {
@@ -117,14 +195,20 @@ export default function ProfileScreen({ navigation, route, onLogout }) {
 
   const handleLogout = () => {
     setShowMenu(false);
-    Alert.alert(getText("logout"), getText("confirmLogout"), [
-      { text: getText("cancel"), style: "cancel" },
-      {
-        text: getText("logout"),
-        style: "destructive",
-        onPress: () => onLogout(),
-      },
-    ]);
+    if (Platform.OS === "web") {
+      // Use native confirm on web
+      const ok = window.confirm(getText("confirmLogout"));
+      if (ok) onLogout();
+    } else {
+      Alert.alert(getText("logout"), getText("confirmLogout"), [
+        { text: getText("cancel"), style: "cancel" },
+        {
+          text: getText("logout"),
+          style: "destructive",
+          onPress: () => onLogout(),
+        },
+      ]);
+    }
   };
 
   const selectGender = (g) => {

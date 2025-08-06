@@ -31,11 +31,11 @@ export default function LoginScreen({ navigation, onLogin }) {
 
     try {
       const loginRes = await loginUser({ correo: email, contraseña: password });
-      const token = loginRes.data.access_token;
-      const userRes = await getCurrentUser(token);
-      const user = userRes.data;
-      setUsuario({ ...user, token });
-      onLogin({ ...user, token });
+      // API returns { success, usuario }
+      const user = loginRes.data.usuario;
+      // Save to context and parent
+      setUsuario(user);
+      onLogin(user);
     } catch (error) {
       Alert.alert("Error", error.response?.data?.detail || error.message);
     }

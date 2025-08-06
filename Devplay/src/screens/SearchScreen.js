@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   Text,
@@ -13,10 +13,23 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
-import { getApps, getAllSecciones, getAppsDeSeccion } from "../services/api";
+import {
+  getApps,
+  getAllSecciones,
+  getAppsDeSeccion,
+  postDescarga,
+  getMisApps,
+} from "../services/api";
+import { useAuth } from "../context/AuthContext";
+import { UserContext } from "../context/UserContext";
 
 export default function SearchScreen({ navigation }) {
   const { theme, getText } = useTheme();
+  const { user: authUser } = useAuth();
+  const { usuario: contextUser } = useContext(UserContext);
+
+  // Usar el usuario de cualquiera de los dos contextos
+  const user = authUser || contextUser;
   const [searchText, setSearchText] = useState("");
   const [filteredApps, setFilteredApps] = useState([]);
   const [recentSearches, setRecentSearches] = useState([
@@ -30,6 +43,7 @@ export default function SearchScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [sections, setSections] = useState([]);
   const [sectionApps, setSectionApps] = useState({});
+  const [installedApps, setInstalledApps] = useState([]);
 
   // Obtener apps desde el backend al montar
   useEffect(() => {
@@ -68,6 +82,20 @@ export default function SearchScreen({ navigation }) {
       })
       .catch((e) => console.error("Error loading sections:", e));
   }, []);
+
+  // Cargar apps instaladas del usuario
+  useEffect(() => {
+    const userId = user?.id || user?.id_usuario || user?.usuario_id;
+    if (!userId) return;
+
+    getMisApps(userId)
+      .then((res) => {
+        // Extraer solo los IDs de las apps instaladas
+        const installedIds = res.data.map((app) => app.id_app);
+        setInstalledApps(installedIds);
+      })
+      .catch((e) => console.error("Error loading installed apps:", e));
+  }, [user]);
 
   // Función para filtrar aplicaciones
   const filterApps = (text) => {
@@ -120,6 +148,11 @@ export default function SearchScreen({ navigation }) {
     navigation.navigate("AppDetails", { app });
   };
 
+  // Verificar si una app está instalada
+  const isAppInstalled = (appId) => {
+    return installedApps.includes(appId);
+  };
+
   // Limpiar búsqueda
   const clearSearch = () => {
     setSearchText("");
@@ -128,35 +161,87 @@ export default function SearchScreen({ navigation }) {
 
   // Renderizar item de aplicación
   const renderAppItem = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.appItem, { backgroundColor: theme.cardBackground }]}
-      onPress={() => handleAppPress(item)}
-    >
-      <Image source={{ uri: item.icon }} style={styles.appIcon} />
-      <View style={styles.appInfo}>
-        <Text style={[styles.appName, { color: theme.textColor }]}>
-          {item.name}
-        </Text>
-        <Text
-          style={[styles.appDeveloper, { color: theme.secondaryTextColor }]}
-        >
-          {item.developer}
-        </Text>
-        <Text style={[styles.appCategory, { color: theme.primary }]}>
-          {getText(item.category?.toLowerCase())}
-        </Text>
-      </View>
+    <View style={[styles.appItem, { backgroundColor: theme.cardBackground }]}>
+      <TouchableOpacity
+        style={styles.appContent}
+        onPress={() => handleAppPress(item)}
+      >
+        <Image source={{ uri: item.icon }} style={styles.appIcon} />
+        <View style={styles.appInfo}>
+          <Text style={[styles.appName, { color: theme.textColor }]}>
+            {item.name}
+          </Text>
+          <Text
+            style={[styles.appDeveloper, { color: theme.secondaryTextColor }]}
+          >
+            {item.developer}
+          </Text>
+          <Text style={[styles.appCategory, { color: theme.primary }]}>
+            {getText(item.category?.toLowerCase())}
+          </Text>
+        </View>
+      </TouchableOpacity>
       <View style={styles.appActions}>
         <Text style={[styles.appRating, { color: theme.textColor }]}>
           ⭐ {item.rating}
         </Text>
         <TouchableOpacity
-          style={[styles.installButton, { backgroundColor: theme.primary }]}
+          style={[
+            styles.installButton,
+            {
+              backgroundColor: isAppInstalled(item.id)
+                ? theme.secondaryTextColor
+                : theme.primary,
+            },
+          ]}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          disabled={isAppInstalled(item.id)}
+          onPress={(e) => {
+            e.stopPropagation();
+            console.log("Botón instalación presionado para:", item.name);
+            console.log("Usuario completo:", user);
+            console.log("Usuario ID:", user?.id);
+            console.log("Usuario id_usuario:", user?.id_usuario);
+            console.log("App ID:", item.id);
+
+            // Verificar diferentes campos de ID del usuario
+            const userId = user?.id || user?.id_usuario || user?.usuario_id;
+
+            if (!userId) {
+              console.log("No se encontró ID de usuario válido");
+              return Alert.alert("Error", "Usuario no autenticado");
+            }
+
+            // Mostrar alerta de confirmación primero
+            Alert.alert("Instalar", `¿Deseas instalar ${item.name}?`, [
+              { text: "Cancelar", style: "cancel" },
+              {
+                text: "Instalar",
+                onPress: () => {
+                  postDescarga({ id_app: item.id, usuario_id: userId })
+                    .then(() => {
+                      Alert.alert("Éxito", "Juego instalado correctamente");
+                      // Actualizar lista de apps instaladas
+                      setInstalledApps((prev) => [...prev, item.id]);
+                    })
+                    .catch((err) => {
+                      console.error("Error al registrar descarga:", err);
+                      Alert.alert("Error", "Error al instalar el juego");
+                    });
+                },
+              },
+            ]);
+          }}
         >
-          <Text style={styles.installButtonText}>{getText("install")}</Text>
+          <Text style={styles.installButtonText}>
+            {isAppInstalled(item.id)
+              ? "Instalado"
+              : getText("install") || "Instalar"}
+          </Text>
         </TouchableOpacity>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 
   // Renderizar búsqueda reciente
@@ -344,6 +429,7 @@ const styles = StyleSheet.create({
   },
   resultsList: {
     paddingBottom: 20,
+    paddingTop: 10,
   },
   appItem: {
     flexDirection: "row",
@@ -351,6 +437,11 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 10,
     borderRadius: 12,
+  },
+  appContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
   },
   appIcon: {
     width: 50,
@@ -382,14 +473,24 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   installButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    minHeight: 44,
+    minWidth: 80,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   installButtonText: {
     color: "white",
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "600",
+    textAlign: "center",
   },
   noResultsContainer: {
     flex: 1,

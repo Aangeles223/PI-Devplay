@@ -13,8 +13,29 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { UserContext } from "../context/UserContext";
 import { getNotificacionesByUser } from "../services/api";
+import Notifications from "../services/notifications";
 
 export default function NotificationsScreen({ navigation }) {
+  // Subscribe to incoming notifications and append to list
+  useEffect(() => {
+    if (
+      Platform.OS !== "web" &&
+      Notifications.addNotificationReceivedListener
+    ) {
+      const subscription = Notifications.addNotificationReceivedListener(
+        ({ request }) => {
+          const { body } = request.content;
+          const newNotification = {
+            id: Date.now(),
+            descripcion: body,
+            fecha_creacion: new Date().toISOString(),
+          };
+          setNotificationsList((prev) => [newNotification, ...prev]);
+        }
+      );
+      return () => subscription.remove();
+    }
+  }, []);
   const { theme, getText } = useTheme();
   const { usuario } = useContext(UserContext);
   const [notifications, setNotifications] = useState({
