@@ -25,10 +25,11 @@ db.connect((err) => {
 // REGISTRO de usuario
 app.post("/register", async (req, res) => {
   try {
+    // Desestructurar datos de registro
     const {
       nombre,
       correo,
-      contraseña,
+      contrasena,
       status_id,
       telefono,
       pais_id,
@@ -37,13 +38,15 @@ app.post("/register", async (req, res) => {
       fecha_nacimiento,
     } = req.body;
 
-    const hash = await bcrypt.hash(contraseña, 10);
+    // Encriptar contraseña
+    const hash = await bcrypt.hash(contrasena, 10);
 
+    // Insertar nuevo usuario
     db.query(
-      `INSERT INTO usuario 
-        (nombre, correo, contraseña, avatar, fecha_creacion, status_id, telefono, pais_id, direccion, genero_id, fecha_nacimiento) 
-        VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)`,
-      [
+      `INSERT INTO usuario
+         (nombre, correo, \\`contraseña\\`, avatar, fecha_creacion, status_id, telefono, pais_id, direccion, genero_id, fecha_nacimiento)
+       VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)`,
+        [
         nombre,
         correo,
         hash,
@@ -74,10 +77,10 @@ app.post("/register", async (req, res) => {
 
 // LOGIN de usuario
 app.post("/login", (req, res) => {
-  const { correo, contraseña } = req.body;
-  console.log("Intento de login:", { correo, contraseña: "***" });
+  const { correo, contrasena } = req.body;
+  console.log("Intento de login:", { correo, contrasena: "***" });
 
-  if (!correo || !contraseña) {
+  if (!correo || !contrasena) {
     return res.status(400).json({ error: "Faltan datos" });
   }
 
@@ -123,7 +126,7 @@ app.post("/login", (req, res) => {
       });
 
       try {
-        const match = await bcrypt.compare(contraseña, usuario.contraseña);
+        const match = await bcrypt.compare(contrasena, usuario["contraseña"]);
         console.log("Comparación de contraseña:", match);
 
         if (match) {
@@ -381,7 +384,7 @@ app.post("/descargas", (req, res) => {
   const { id_app, usuario_id } = req.body;
 
   console.log("Datos recibidos:", { id_app, usuario_id });
-
+  if (!correo || !contrasena) {
   if (!id_app || !usuario_id) {
     return res
       .status(400)
